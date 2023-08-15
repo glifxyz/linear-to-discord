@@ -1,5 +1,5 @@
 import type { IIssueData, ILinearData, ILinearUpdateData } from '@/@types';
-import { UPDATABLE_FIELDS } from '@/config/appConstants';
+import { ERRORS, UPDATABLE_FIELDS } from '@/config/appConstants';
 
 const findUpdatedField = (data: ILinearUpdateData<IIssueData>) => {
   const { updatedFrom } = data;
@@ -75,8 +75,8 @@ export const createIssueParser = (data: ILinearData<IIssueData>) => {
 };
 
 export const updateIssueParser = (data: ILinearData<IIssueData>) => {
-  const { data: issue, url } = data;
-  const { title } = issue;
+  // const { data: issue, url } = data;
+  // const { title } = issue;
   const updatedField = findUpdatedField(data);
   switch (updatedField?.key) {
     case 'title':
@@ -88,6 +88,7 @@ export const updateIssueParser = (data: ILinearData<IIssueData>) => {
     case 'labelIds':
       return labelUpdateParser(data);
     default:
-      return `Issue [${title}](${url}) updated`;
+      // return `Issue [${title}](${url}) updated`;
+      return ERRORS.ACTION_IGNORED;
   }
 };

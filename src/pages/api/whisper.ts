@@ -12,7 +12,10 @@ export default async function handler(
   const message = parseData(data);
   if (message === ERRORS.UNKNOWN_ACTION) {
     return res.json({ success: false, message: ERRORS.UNKNOWN_ACTION });
+  } else if (message === ERRORS.ACTION_IGNORED) {
+    return res.json({ success: false, message: ERRORS.ACTION_IGNORED });
   }
+
   return sendMessage(message)
     .then(() => res.json({ success: true }))
     .catch((err) => res.json({ success: false, message: err.message }));
