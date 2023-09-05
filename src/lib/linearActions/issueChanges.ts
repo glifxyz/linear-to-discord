@@ -31,7 +31,7 @@ export const stateUpdateParser = (
   const { data: issue, url } = data;
   const { state } = issue;
   const { name } = state;
-  return `[${issue.title}](${url}) status updated to **${name}**`;
+  return `Issue updated: [${issue.title}](${url}) status changed to **${name}**`;
 };
 
 export const labelUpdateParser = (
