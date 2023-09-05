@@ -86,7 +86,8 @@ export const updateIssueParser = (data: ILinearData<IIssueData>) => {
     case 'assigneeId':
       return assigneeUpdateParser(data);
     case 'labelIds':
-      return labelUpdateParser(data);
+      // return labelUpdateParser(data);
+      return ERRORS.ACTION_IGNORED;
     default:
       // return `Issue [${title}](${url}) updated`;
       return ERRORS.ACTION_IGNORED;
