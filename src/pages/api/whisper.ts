@@ -11,7 +11,7 @@ export default async function handler(
   const data = req.body;
   const message = parseData(data);
   if (message === ERRORS.UNKNOWN_ACTION) {
-    console.log('Unknown actin', { data, message });
+    console.log('Unknown action', { data, message });
     return res.json({ success: false, message: ERRORS.UNKNOWN_ACTION });
   } else if (message === ERRORS.ACTION_IGNORED) {
     console.log('Action ignored', { data, message });
