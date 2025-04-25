@@ -1,4 +1,4 @@
-# 🔌 Linear to Discord  
+# 🔌 Linear to Discord
 
 A simple webhook service for sending linear notifications to discord.
 
@@ -12,14 +12,14 @@ A simple webhook service for sending linear notifications to discord.
 4. Add the webhook url to linear. [Guide](https://linear.app/settings/api)
 5. Done! You should now receive notifications in the discord channel.
 
-## Development 
+## Development
 
 1. Clone the repository.
 2. Install dependencies using `npm install`.
 3. Run the development server using `npm run dev`.
 
 
-## Deployment 
+## Deployment
 You can use the vercel button above to deploy the project to vercel or follow the steps below to deploy it manually.
 
 1. Clone the repository.
@@ -32,5 +32,3 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 ## License
 [MIT](LICENSE)
-
-
