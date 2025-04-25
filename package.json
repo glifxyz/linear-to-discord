@@ -13,7 +13,6 @@
     "format": "next lint --fix && prettier '**/*.{json,yaml}' --write --ignore-path .gitignore",
     "check-types": "tsc --noEmit --pretty",
     "test": "jest",
-    "commit": "cz",
     "postbuild": "next-sitemap"
   },
   "dependencies": {
@@ -25,9 +24,6 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^17.6.5",
-    "@commitlint/config-conventional": "^17.6.5",
-    "@commitlint/cz-commitlint": "^17.5.0",
     "@next/bundle-analyzer": "^13.4.4",
     "@percy/cli": "^1.25.0",
     "@semantic-release/changelog": "^6.0.3",
@@ -40,7 +36,6 @@
     "@typescript-eslint/eslint-plugin": "^5.59.9",
     "@typescript-eslint/parser": "^5.59.9",
     "autoprefixer": "^10.4.14",
-    "commitizen": "^4.3.0",
     "cross-env": "^7.0.3",
     "cssnano": "^6.0.1",
     "eslint": "^8.42.0",
@@ -73,11 +68,6 @@
     "start-server-and-test": "^2.0.0",
     "tailwindcss": "^3.3.2",
     "typescript": "^4.9.5"
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   },
   "release": {
     "branches": [
