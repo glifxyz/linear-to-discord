@@ -1,14 +1,6 @@
-import axios from 'axios';
+import wretch from "wretch";
+import { env } from "@/config/env";
 
-import { env } from '@/config/env';
-
-export const sendMessage = (message: string) => {
-  return axios({
-    url: env.DISCORD_WEBHOOK,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    data: { content: message },
-  }).then((res) => res.data);
+export const sendMessage = async (message: string) => {
+  return wretch(env.DISCORD_WEBHOOK).post({ content: message }).json();
 };
