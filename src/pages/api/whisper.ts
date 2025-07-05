@@ -1,25 +1,59 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { ERRORS } from '@/config/appConstants';
 import { sendMessage } from '@/lib/discord';
-import { parseData } from '@/lib/linear';
+import {
+  getFinalMessage,
+  parseLinearWebhook,
+  shouldSendEvent,
+} from '@/lib/linear/router';
+import type { AnyLinearWebhookPayload } from '@/lib/linear/types';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const data = req.body;
-  const message = parseData(data);
-  if (message === ERRORS.UNKNOWN_ACTION) {
-    console.log('Unknown action', { data, message });
-    return res.json({ success: false, message: ERRORS.UNKNOWN_ACTION });
-  } else if (message === ERRORS.ACTION_IGNORED) {
-    console.log('Action ignored', { data, message });
-    return res.json({ success: false, message: ERRORS.ACTION_IGNORED });
-  }
+  try {
+    const payload = req.body as AnyLinearWebhookPayload;
 
-  console.log('Posting message', { data, message });
-  return sendMessage(message)
-    .then(() => res.json({ success: true }))
-    .catch((err) => res.json({ success: false, message: err.message }));
+    // Parse the webhook event
+    const parsedEvent = parseLinearWebhook(payload);
+
+    // Check if we should send this event
+    if (!shouldSendEvent(parsedEvent)) {
+      console.log('Event ignored', {
+        type: payload.type,
+        action: payload.action,
+        priority: parsedEvent.priority,
+        reason: parsedEvent.message,
+      });
+      return res.json({ success: true, message: 'Event ignored' });
+    }
+
+    // Get the final formatted message
+    const finalMessage = getFinalMessage(parsedEvent);
+
+    console.log('Posting message', {
+      type: payload.type,
+      action: payload.action,
+      priority: parsedEvent.priority,
+      message: finalMessage,
+    });
+
+    // Send to Discord
+    await sendMessage(finalMessage);
+
+    return res.json({
+      success: true,
+      type: payload.type,
+      action: payload.action,
+      priority: parsedEvent.priority,
+    });
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+
+    return res.json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
