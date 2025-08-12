@@ -3,7 +3,7 @@ export interface ILinearData<T> {
   createdAt: Date;
   data: T;
   url: string;
-  type: 'Issue' | 'Comment';
+  type: 'Issue' | 'Comment' | 'Project' | 'ProjectUpdate';
   organizationId: string;
   webhookTimestamp: number;
 }
@@ -95,4 +95,43 @@ export interface IUpdatedFrom {
   completedAt: null;
   stateId: string;
   labelIds: string[];
+}
+
+export interface IProjectData {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  priority: number;
+  color: string;
+  icon?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  startDate?: Date;
+  targetDate?: Date;
+  completedAt?: Date;
+  canceledAt?: Date;
+  teams: ITeam[];
+  lead?: IUser;
+  members: IUser[];
+  url: string;
+}
+
+export interface IProjectUpdateData {
+  id: string;
+  body: string;
+  bodyData?: string;
+  health: 'onTrack' | 'atRisk' | 'offTrack' | 'completed';
+  createdAt: Date;
+  updatedAt: Date;
+  project: {
+    id: string;
+    name: string;
+    url: string;
+    status: string;
+    color: string;
+    icon?: string;
+  };
+  user: IUser;
+  url: string;
 }

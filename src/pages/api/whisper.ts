@@ -18,8 +18,12 @@ export default async function handler(
     return res.json({ success: false, message: ERRORS.ACTION_IGNORED });
   }
 
-  console.log('Posting message', { data, message });
-  return sendMessage(message)
+  // Check if this is a project-related update
+  const isProjectUpdate =
+    data.type === 'Project' || data.type === 'ProjectUpdate';
+
+  console.log('Posting message', { data, message, isProjectUpdate });
+  return sendMessage(message, isProjectUpdate)
     .then(() => res.json({ success: true }))
-    .catch((err) => res.json({ success: false, message: err.message }));
+    .catch((err: any) => res.json({ success: false, message: err.message }));
 }
