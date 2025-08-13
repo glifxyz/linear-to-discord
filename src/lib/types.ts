@@ -3,14 +3,7 @@ import { z } from "zod";
 // Zod schemas for webhook payload validation
 export const WebhookPayloadSchema = z.object({
   action: z.enum(["create", "update", "remove"]),
-  type: z.enum([
-    "Issue",
-    "Comment",
-    "Project",
-    "ProjectUpdate",
-    "Cycle",
-    "IssueSla",
-  ]),
+  type: z.enum(["Issue", "Comment"]),
   createdAt: z.string(),
   data: z.record(z.any()),
   url: z.string(),
