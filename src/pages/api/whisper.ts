@@ -23,7 +23,15 @@ export default async function handler(
       priority: parsedEvent.priority,
       reason: parsedEvent.message,
     });
-    return res.json({ success: true, message: "Event ignored" });
+    return res.json({
+      success: true,
+      message: "Event ignored",
+      data: {
+        type: payload.type,
+        action: payload.action,
+        priority: parsedEvent.priority,
+      },
+    });
   }
 
   // Get the final formatted message
@@ -41,8 +49,11 @@ export default async function handler(
 
   return res.json({
     success: true,
-    type: payload.type,
-    action: payload.action,
-    priority: parsedEvent.priority,
+    message: "Event processed successfully",
+    data: {
+      type: payload.type,
+      action: payload.action,
+      priority: parsedEvent.priority,
+    },
   });
 }

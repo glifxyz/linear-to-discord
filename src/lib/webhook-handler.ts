@@ -53,7 +53,7 @@ const parseIssueEvent = (action: string, data: any): ParsedEvent => {
         }-${number}**: ${title}\n**Priority**: ${priorityLabel}\n**Assignee**: ${
           assignee?.name || "Unassigned"
         }\n**Creator**: ${creator?.name}`,
-        priority: priority >= 2 ? EventPriority.HIGH : EventPriority.MEDIUM,
+        priority: priority <= 2 ? EventPriority.HIGH : EventPriority.MEDIUM,
         shouldSend: true,
       };
 
