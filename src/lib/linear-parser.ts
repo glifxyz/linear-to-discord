@@ -4,6 +4,12 @@ import {
   ParsedEvent,
   EventPriority,
   PRIORITY_LABELS,
+  LinearTeam,
+  LinearUser,
+  LinearIssue,
+  LinearComment,
+  LinearProject,
+  LinearProjectUpdate,
 } from "./linear-types";
 
 // Helper functions
@@ -13,9 +19,9 @@ const createUnsupportedEvent = (message: string): ParsedEvent => ({
   shouldSend: false,
 });
 
-const getIssueId = (team: any, number: number): string =>
+const getIssueId = (team: LinearTeam | undefined, number: number): string =>
   `${team?.key}-${number}`;
-const getAssigneeName = (assignee: any): string =>
+const getAssigneeName = (assignee: LinearUser | undefined): string =>
   assignee?.name || "Unassigned";
 
 const getHealthEmoji = (health: string): string => {
@@ -68,9 +74,9 @@ const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
   }
 };
 
-const formatIssueMessage = (action: string, data: any): ParsedEvent => {
+const formatIssueMessage = (action: string, data: LinearIssue): ParsedEvent => {
   const { title, number, team, state, priority, assignee, creator } = data;
-  const issueId = getIssueId(team, number);
+  const issueId = getIssueId(team, number || 0);
   const assigneeName = getAssigneeName(assignee);
 
   switch (action) {
@@ -79,7 +85,8 @@ const formatIssueMessage = (action: string, data: any): ParsedEvent => {
         PRIORITY_LABELS[priority as keyof typeof PRIORITY_LABELS] || "Unknown";
       return {
         message: `🆕 **New Issue Created**\n**${issueId}**: ${title}\n**Priority**: ${priorityLabel}\n**Assignee**: ${assigneeName}\n**Creator**: ${creator?.name}`,
-        priority: priority <= 2 ? EventPriority.HIGH : EventPriority.MEDIUM,
+        priority:
+          (priority || 4) <= 2 ? EventPriority.HIGH : EventPriority.MEDIUM,
         shouldSend: true,
       };
 
@@ -95,13 +102,17 @@ const formatIssueMessage = (action: string, data: any): ParsedEvent => {
   }
 };
 
-const formatCommentMessage = (action: string, data: any): ParsedEvent => {
+const formatCommentMessage = (
+  action: string,
+  data: LinearComment
+): ParsedEvent => {
   if (action !== "create") {
     return createUnsupportedEvent(`Unsupported comment action: ${action}`);
   }
 
   const { body, user, issue } = data;
-  const truncatedBody = body.length > 200 ? `${body.slice(0, 200)}...` : body;
+  const truncatedBody =
+    body && body.length > 200 ? `${body.slice(0, 200)}...` : body || "";
 
   return {
     message: `💬 **New Comment**\n**Issue**: ${issue?.title}\n**Author**: ${user?.name}\n**Comment**: ${truncatedBody}`,
@@ -110,7 +121,10 @@ const formatCommentMessage = (action: string, data: any): ParsedEvent => {
   };
 };
 
-const formatProjectMessage = (action: string, data: any): ParsedEvent => {
+const formatProjectMessage = (
+  action: string,
+  data: LinearProject
+): ParsedEvent => {
   const { name, description, lead } = data;
 
   if (action === "create") {
@@ -137,11 +151,14 @@ const formatProjectMessage = (action: string, data: any): ParsedEvent => {
   return createUnsupportedEvent(`Unsupported project action: ${action}`);
 };
 
-const formatProjectUpdateMessage = (action: string, data: any): ParsedEvent => {
+const formatProjectUpdateMessage = (
+  action: string,
+  data: LinearProjectUpdate
+): ParsedEvent => {
   const { project, user, health, body } = data;
 
   if (action === "create") {
-    const healthEmoji = getHealthEmoji(health);
+    const healthEmoji = getHealthEmoji(health || "unknown");
     let message = `${healthEmoji} **Project Update:** ${project?.name}`;
     message += `\n**Author:** ${user?.name}`;
     message += `\n**Status:** ${health}`;
@@ -158,7 +175,7 @@ const formatProjectUpdateMessage = (action: string, data: any): ParsedEvent => {
   }
 
   if (action === "update") {
-    const healthEmoji = getHealthEmoji(health);
+    const healthEmoji = getHealthEmoji(health || "unknown");
     return {
       message: `${healthEmoji} **Project Update Modified:** ${project?.name} by ${user?.name}`,
       priority: EventPriority.MEDIUM,

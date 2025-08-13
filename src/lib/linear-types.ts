@@ -39,3 +39,48 @@ export const PRIORITY_LABELS = {
 } as const;
 
 export type LinearPriority = keyof typeof PRIORITY_LABELS;
+
+// Linear entity types based on webhook data structure
+export interface LinearTeam {
+  key?: string;
+  name?: string;
+}
+
+export interface LinearUser {
+  name?: string;
+  id?: string;
+}
+
+export interface LinearState {
+  name?: string;
+  id?: string;
+}
+
+export interface LinearIssue {
+  title?: string;
+  number?: number;
+  team?: LinearTeam;
+  state?: LinearState;
+  priority?: LinearPriority;
+  assignee?: LinearUser;
+  creator?: LinearUser;
+}
+
+export interface LinearComment {
+  body?: string;
+  user?: LinearUser;
+  issue?: LinearIssue;
+}
+
+export interface LinearProject {
+  name?: string;
+  description?: string;
+  lead?: LinearUser;
+}
+
+export interface LinearProjectUpdate {
+  project?: LinearProject;
+  user?: LinearUser;
+  health?: string;
+  body?: string;
+}
