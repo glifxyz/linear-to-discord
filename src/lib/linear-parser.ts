@@ -18,6 +18,26 @@ const getIssueId = (team: any, number: number): string =>
 const getAssigneeName = (assignee: any): string =>
   assignee?.name || "Unassigned";
 
+const getHealthEmoji = (health: string): string => {
+  switch (health) {
+    case "onTrack":
+      return "🟢";
+    case "atRisk":
+      return "🟡";
+    case "offTrack":
+      return "🔴";
+    case "completed":
+      return "✅";
+    default:
+      return "⚪";
+  }
+};
+
+const truncateText = (text: string, maxLength: number = 200): string => {
+  if (text.length <= maxLength) return text;
+  return `${text.substring(0, maxLength)}...`;
+};
+
 // Simple webhook parser using Linear SDK patterns
 export const parseLinearWebhook = (payload: unknown): ParsedEvent => {
   try {
@@ -39,6 +59,10 @@ const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
       return formatIssueMessage(action, data);
     case "Comment":
       return formatCommentMessage(action, data);
+    case "Project":
+      return formatProjectMessage(action, data);
+    case "ProjectUpdate":
+      return formatProjectUpdateMessage(action, data);
     default:
       return createUnsupportedEvent(`Unsupported event: ${type}`);
   }
@@ -84,6 +108,65 @@ const formatCommentMessage = (action: string, data: any): ParsedEvent => {
     priority: EventPriority.MEDIUM,
     shouldSend: true,
   };
+};
+
+const formatProjectMessage = (action: string, data: any): ParsedEvent => {
+  const { name, description, lead } = data;
+
+  if (action === "create") {
+    let message = `📊 **New Project Created:** ${name}`;
+    if (lead?.name) message += `\n**Lead:** ${lead.name}`;
+    if (description)
+      message += `\n**Description:** ${truncateText(description, 100)}`;
+
+    return {
+      message,
+      priority: EventPriority.MEDIUM,
+      shouldSend: true,
+    };
+  }
+
+  if (action === "update") {
+    return {
+      message: `📊 **Project Updated:** ${name}`,
+      priority: EventPriority.LOW,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Unsupported project action: ${action}`);
+};
+
+const formatProjectUpdateMessage = (action: string, data: any): ParsedEvent => {
+  const { project, user, health, body } = data;
+
+  if (action === "create") {
+    const healthEmoji = getHealthEmoji(health);
+    let message = `${healthEmoji} **Project Update:** ${project?.name}`;
+    message += `\n**Author:** ${user?.name}`;
+    message += `\n**Status:** ${health}`;
+    if (body) {
+      const cleanBody = body.replace(/\n/g, " ").trim();
+      message += `\n**Update:** ${truncateText(cleanBody)}`;
+    }
+
+    return {
+      message,
+      priority: EventPriority.HIGH,
+      shouldSend: true,
+    };
+  }
+
+  if (action === "update") {
+    const healthEmoji = getHealthEmoji(health);
+    return {
+      message: `${healthEmoji} **Project Update Modified:** ${project?.name} by ${user?.name}`,
+      priority: EventPriority.MEDIUM,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Unsupported project update action: ${action}`);
 };
 
 export const shouldNotifyDiscord = (event: ParsedEvent): boolean => {
