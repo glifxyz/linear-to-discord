@@ -44,8 +44,12 @@ export default async function handler(
     message: finalMessage,
   });
 
+  // Check if this is a project-related update
+  const isProjectUpdate =
+    payload.type === "Project" || payload.type === "ProjectUpdate";
+
   // Send to Discord
-  await sendDiscordMessage(finalMessage);
+  await sendDiscordMessage(finalMessage, isProjectUpdate);
 
   return res.json({
     success: true,
