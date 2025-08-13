@@ -1,10 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { sendMessage } from "@/lib/discord";
+import { sendDiscordMessage } from "@/lib/discord-client";
 import {
-  parseWebhookEvent,
-  shouldSendEvent,
-  formatFinalMessage,
-} from "@/lib/webhook-handler";
+  parseLinearWebhook,
+  shouldNotifyDiscord,
+  formatDiscordMessage,
+} from "@/lib/linear-parser";
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,10 +13,10 @@ export default async function handler(
   const payload = req.body;
 
   // Parse the webhook event
-  const parsedEvent = parseWebhookEvent(payload);
+  const parsedEvent = parseLinearWebhook(payload);
 
   // Check if we should send this event
-  if (!shouldSendEvent(parsedEvent)) {
+  if (!shouldNotifyDiscord(parsedEvent)) {
     console.log("Event ignored:", {
       type: payload.type,
       action: payload.action,
@@ -35,7 +35,7 @@ export default async function handler(
   }
 
   // Get the final formatted message
-  const finalMessage = formatFinalMessage(parsedEvent);
+  const finalMessage = formatDiscordMessage(parsedEvent);
 
   console.log("Posting message:", {
     type: payload.type,
@@ -45,7 +45,7 @@ export default async function handler(
   });
 
   // Send to Discord
-  await sendMessage(finalMessage);
+  await sendDiscordMessage(finalMessage);
 
   return res.json({
     success: true,
