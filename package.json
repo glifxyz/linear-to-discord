@@ -5,12 +5,13 @@
     "node": ">=22.14.0 <23.0.0"
   },
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint && tsc --noEmit --pretty",
-    "format": "prettier '**/*.{js,ts,tsx,json}' --write --ignore-path .gitignore",
-    "check-types": "tsc --noEmit --pretty"
+    "lint": "next lint && pnpm run typecheck",
+    "typecheck": "tsc --noEmit --pretty",
+    "format": "prettier '**/*.{js,ts,tsx,json}' --write --ignore-path .gitignore"
   },
   "dependencies": {
     "next": "^13.4.4",
