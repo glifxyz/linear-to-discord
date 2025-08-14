@@ -1,3 +1,8 @@
-export const env = {
-  DISCORD_WEBHOOK: process.env.DISCORD_WEBHOOK as string,
-};
+import { z } from "zod";
+
+export const env = z
+  .object({
+    DISCORD_WEBHOOK: z.string().url(),
+    DISCORD_WEBHOOK_PROJECTS: z.string().url().optional(),
+  })
+  .parse(process.env);

@@ -1,21 +1,12 @@
-@tailwind base;
-
-a {
-  @apply text-blue-700;
+/* Minimal styles for webhook service */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #f5f5f5;
 }
 
-a:hover {
-  @apply border-b-2 border-blue-700;
-}
-
-@tailwind components;
-
-@tailwind utilities;
-
-.content p {
-  @apply my-6;
-}
-
-.content ul {
-  @apply my-6;
+p {
+  color: #333;
+  text-align: center;
 }
