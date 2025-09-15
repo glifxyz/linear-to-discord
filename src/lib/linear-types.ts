@@ -2,8 +2,25 @@ import { z } from "zod";
 
 // Zod schemas for webhook payload validation
 export const WebhookPayloadSchema = z.object({
-  action: z.enum(["create", "update", "remove"]),
-  type: z.enum(["Issue", "Comment", "Project", "ProjectUpdate"]),
+  action: z.enum(["create", "update", "remove", "set", "highRisk", "breached"]),
+  type: z.enum([
+    "Issue",
+    "Comment",
+    "Project",
+    "ProjectUpdate",
+    "IssueAttachment",
+    "IssueLabel",
+    "Reaction",
+    "Document",
+    "Initiative",
+    "InitiativeUpdate",
+    "Cycle",
+    "Customer",
+    "CustomerRequest",
+    "User",
+    "IssueSLA",
+    "OAuthAppRevoked"
+  ]),
   createdAt: z.string(),
   data: z.record(z.any()),
   url: z.string(),
@@ -83,4 +100,65 @@ export interface LinearProjectUpdate {
   user?: LinearUser;
   health?: string;
   body?: string;
+}
+
+export interface LinearCycle {
+  name?: string;
+  number?: number;
+  startsAt?: string;
+  endsAt?: string;
+  team?: LinearTeam;
+}
+
+export interface LinearDocument {
+  title?: string;
+  project?: LinearProject;
+  creator?: LinearUser;
+}
+
+export interface LinearInitiative {
+  name?: string;
+  description?: string;
+}
+
+export interface LinearInitiativeUpdate {
+  initiative?: LinearInitiative;
+  user?: LinearUser;
+  body?: string;
+}
+
+export interface LinearIssueAttachment {
+  title?: string;
+  url?: string;
+  issue?: LinearIssue;
+  creator?: LinearUser;
+}
+
+export interface LinearIssueLabel {
+  name?: string;
+  color?: string;
+  team?: LinearTeam;
+}
+
+export interface LinearReaction {
+  emoji?: string;
+  user?: LinearUser;
+  comment?: LinearComment;
+}
+
+export interface LinearCustomer {
+  name?: string;
+  email?: string;
+}
+
+export interface LinearCustomerRequest {
+  customer?: LinearCustomer;
+  issue?: LinearIssue;
+  title?: string;
+}
+
+export interface LinearIssueSLA {
+  issue?: LinearIssue;
+  breachesAt?: string;
+  status?: string;
 }

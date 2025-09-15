@@ -10,6 +10,16 @@ import {
   LinearComment,
   LinearProject,
   LinearProjectUpdate,
+  LinearCycle,
+  LinearDocument,
+  LinearInitiative,
+  LinearInitiativeUpdate,
+  LinearIssueAttachment,
+  LinearIssueLabel,
+  LinearReaction,
+  LinearCustomer,
+  LinearCustomerRequest,
+  LinearIssueSLA,
 } from "./linear-types";
 
 // Helper functions
@@ -69,6 +79,30 @@ const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
       return formatProjectMessage(action, data);
     case "ProjectUpdate":
       return formatProjectUpdateMessage(action, data);
+    case "Cycle":
+      return formatCycleMessage(action, data);
+    case "Document":
+      return formatDocumentMessage(action, data);
+    case "Initiative":
+      return formatInitiativeMessage(action, data);
+    case "InitiativeUpdate":
+      return formatInitiativeUpdateMessage(action, data);
+    case "IssueAttachment":
+      return formatIssueAttachmentMessage(action, data);
+    case "IssueLabel":
+      return formatIssueLabelMessage(action, data);
+    case "Reaction":
+      return formatReactionMessage(action, data);
+    case "Customer":
+      return formatCustomerMessage(action, data);
+    case "CustomerRequest":
+      return formatCustomerRequestMessage(action, data);
+    case "User":
+      return formatUserMessage(action, data);
+    case "IssueSLA":
+      return formatIssueSLAMessage(action, data);
+    case "OAuthAppRevoked":
+      return formatOAuthRevokedMessage(action, data);
     default:
       return createUnsupportedEvent(`Unsupported event: ${type}`);
   }
@@ -184,6 +218,180 @@ const formatProjectUpdateMessage = (
   }
 
   return createUnsupportedEvent(`Unsupported project update action: ${action}`);
+};
+
+const formatCycleMessage = (action: string, data: LinearCycle): ParsedEvent => {
+  const { name, number, startsAt, endsAt, team } = data;
+
+  if (action === "create") {
+    return {
+      message: `🔄 **New Cycle Created:** ${team?.name} - ${name} (${number})`,
+      priority: EventPriority.HIGH,
+      shouldSend: true,
+    };
+  }
+
+  if (action === "update") {
+    return {
+      message: `🔄 **Cycle Updated:** ${team?.name} - ${name}`,
+      priority: EventPriority.LOW,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Unsupported cycle action: ${action}`);
+};
+
+const formatDocumentMessage = (action: string, data: LinearDocument): ParsedEvent => {
+  const { title, project, creator } = data;
+
+  if (action === "create") {
+    return {
+      message: `📄 **New Document:** ${title}\n**Project:** ${project?.name || "None"}\n**Creator:** ${creator?.name}`,
+      priority: EventPriority.LOW,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Document ${action} events are ignored`);
+};
+
+const formatInitiativeMessage = (action: string, data: LinearInitiative): ParsedEvent => {
+  const { name, description } = data;
+
+  if (action === "create") {
+    return {
+      message: `🎯 **New Initiative:** ${name}${description ? `\n${truncateText(description, 100)}` : ""}`,
+      priority: EventPriority.HIGH,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Initiative ${action} events are ignored`);
+};
+
+const formatInitiativeUpdateMessage = (action: string, data: LinearInitiativeUpdate): ParsedEvent => {
+  const { initiative, user, body } = data;
+
+  if (action === "create") {
+    return {
+      message: `🎯 **Initiative Update:** ${initiative?.name}\n**Author:** ${user?.name}${body ? `\n${truncateText(body)}` : ""}`,
+      priority: EventPriority.MEDIUM,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Initiative update ${action} events are ignored`);
+};
+
+const formatIssueAttachmentMessage = (action: string, data: LinearIssueAttachment): ParsedEvent => {
+  const { title, issue, creator } = data;
+
+  if (action === "create") {
+    return {
+      message: `📎 **Attachment Added:** ${title}\n**Issue:** ${issue?.title}\n**By:** ${creator?.name}`,
+      priority: EventPriority.LOW,
+      shouldSend: false, // Usually too noisy
+    };
+  }
+
+  return createUnsupportedEvent(`Attachment ${action} events are ignored`);
+};
+
+const formatIssueLabelMessage = (action: string, data: LinearIssueLabel): ParsedEvent => {
+  const { name, team } = data;
+
+  if (action === "create") {
+    return {
+      message: `🏷️ **New Label Created:** ${name} in ${team?.name}`,
+      priority: EventPriority.LOW,
+      shouldSend: false, // Administrative, usually not needed
+    };
+  }
+
+  return createUnsupportedEvent(`Label ${action} events are ignored`);
+};
+
+const formatReactionMessage = (action: string, data: LinearReaction): ParsedEvent => {
+  // Reactions are usually too noisy for Discord
+  return createUnsupportedEvent(`Reaction events are ignored`);
+};
+
+const formatCustomerMessage = (action: string, data: LinearCustomer): ParsedEvent => {
+  const { name, email } = data;
+
+  if (action === "create") {
+    return {
+      message: `👤 **New Customer:** ${name} (${email})`,
+      priority: EventPriority.MEDIUM,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Customer ${action} events are ignored`);
+};
+
+const formatCustomerRequestMessage = (action: string, data: LinearCustomerRequest): ParsedEvent => {
+  const { customer, issue, title } = data;
+
+  if (action === "create") {
+    return {
+      message: `📮 **Customer Request:** ${title || issue?.title}\n**Customer:** ${customer?.name}\n**Issue:** ${issue?.title}`,
+      priority: EventPriority.HIGH,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`Customer request ${action} events are ignored`);
+};
+
+const formatUserMessage = (action: string, data: LinearUser): ParsedEvent => {
+  const { name } = data;
+
+  if (action === "create") {
+    return {
+      message: `👋 **New Team Member:** ${name} joined the workspace`,
+      priority: EventPriority.MEDIUM,
+      shouldSend: true,
+    };
+  }
+
+  return createUnsupportedEvent(`User ${action} events are ignored`);
+};
+
+const formatIssueSLAMessage = (action: string, data: LinearIssueSLA): ParsedEvent => {
+  const { issue, breachesAt, status } = data;
+
+  switch (action) {
+    case "set":
+      return {
+        message: `⏰ **SLA Set:** ${issue?.title}\n**Breaches at:** ${breachesAt}`,
+        priority: EventPriority.MEDIUM,
+        shouldSend: true,
+      };
+    case "highRisk":
+      return {
+        message: `⚠️ **SLA High Risk:** ${issue?.title} is at risk of breaching SLA`,
+        priority: EventPriority.HIGH,
+        shouldSend: true,
+      };
+    case "breached":
+      return {
+        message: `🚨 **SLA BREACHED:** ${issue?.title} has breached its SLA`,
+        priority: EventPriority.HIGH,
+        shouldSend: true,
+      };
+    default:
+      return createUnsupportedEvent(`Unsupported SLA action: ${action}`);
+  }
+};
+
+const formatOAuthRevokedMessage = (action: string, data: any): ParsedEvent => {
+  return {
+    message: `🔐 **OAuth App Access Revoked** - Please check your Linear integration settings`,
+    priority: EventPriority.HIGH,
+    shouldSend: true,
+  };
 };
 
 export const shouldNotifyDiscord = (event: ParsedEvent): boolean => {
