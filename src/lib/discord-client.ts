@@ -1,6 +1,6 @@
 import wretch from "wretch";
-import { env } from "@/config/env";
 import { z } from "zod";
+import { env } from "@/config/env";
 
 // Discord webhook response schema for type safety
 const DiscordWebhookResponseSchema = z.object({
@@ -18,9 +18,7 @@ const DiscordWebhookResponseSchema = z.object({
   timestamp: z.string().optional(),
 });
 
-export type DiscordWebhookResponse = z.infer<
-  typeof DiscordWebhookResponseSchema
->;
+export type DiscordWebhookResponse = z.infer<typeof DiscordWebhookResponseSchema>;
 
 export const sendDiscordMessage = async (
   message: string,
@@ -33,9 +31,7 @@ export const sendDiscordMessage = async (
       : env.DISCORD_WEBHOOK;
 
   try {
-    const response = await wretch(webhookUrl)
-      .post({ content: message })
-      .json<unknown>();
+    const response = await wretch(webhookUrl).post({ content: message }).json<unknown>();
 
     // Validate the response
     const validatedResponse = DiscordWebhookResponseSchema.parse(response);
@@ -50,9 +46,7 @@ export const sendDiscordMessage = async (
     }
 
     throw new Error(
-      `Failed to send Discord message: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
+      `Failed to send Discord message: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 };
