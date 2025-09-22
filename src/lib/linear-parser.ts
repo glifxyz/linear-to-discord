@@ -115,7 +115,9 @@ const formatIssueMessage = (action: string, data: LinearIssue): ParsedEvent => {
   switch (action) {
     case "create":
       const priorityLabel =
-        PRIORITY_LABELS[priority as keyof typeof PRIORITY_LABELS] || "Unknown";
+        priority !== undefined && priority >= 0 && priority <= 4
+          ? PRIORITY_LABELS[priority as 0 | 1 | 2 | 3 | 4]
+          : "Unknown";
       return {
         message: `🆕 **New Issue Created**\n**${issueId}**: ${title}\n**Priority**: ${priorityLabel}\n**Assignee**: ${assigneeName}\n**Creator**: ${creator?.name}`,
         priority:
