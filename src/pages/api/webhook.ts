@@ -1,16 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { sendDiscordMessage } from "@/lib/discord-client";
-import {
-  parseLinearWebhook,
-  shouldNotifyDiscord,
-  formatDiscordMessage,
-} from "@/lib/linear-parser";
+import { formatDiscordMessage, parseLinearWebhook, shouldNotifyDiscord } from "@/lib/linear-parser";
 import { WebhookPayloadSchema } from "@/lib/linear-types";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Validate the webhook payload
     const validationResult = WebhookPayloadSchema.safeParse(req.body);
@@ -59,8 +52,7 @@ export default async function handler(
     });
 
     // Check if this is a project-related update
-    const isProjectUpdate =
-      payload.type === "Project" || payload.type === "ProjectUpdate";
+    const isProjectUpdate = payload.type === "Project" || payload.type === "ProjectUpdate";
 
     // Send to Discord
     await sendDiscordMessage(finalMessage, isProjectUpdate);
