@@ -19,7 +19,7 @@ export const WebhookPayloadSchema = z.object({
     "CustomerRequest",
     "User",
     "IssueSLA",
-    "OAuthAppRevoked"
+    "OAuthAppRevoked",
   ]),
   createdAt: z.string(),
   data: z.record(z.any()),

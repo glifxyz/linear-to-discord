@@ -16,7 +16,6 @@ import {
   LinearInitiativeUpdate,
   LinearIssueAttachment,
   LinearIssueLabel,
-  LinearReaction,
   LinearCustomer,
   LinearCustomerRequest,
   LinearIssueSLA,
@@ -92,7 +91,7 @@ const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
     case "IssueLabel":
       return formatIssueLabelMessage(action, data);
     case "Reaction":
-      return formatReactionMessage(action, data);
+      return formatReactionMessage();
     case "Customer":
       return formatCustomerMessage(action, data);
     case "CustomerRequest":
@@ -102,7 +101,7 @@ const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
     case "IssueSLA":
       return formatIssueSLAMessage(action, data);
     case "OAuthAppRevoked":
-      return formatOAuthRevokedMessage(action, data);
+      return formatOAuthRevokedMessage();
     default:
       return createUnsupportedEvent(`Unsupported event: ${type}`);
   }
@@ -221,7 +220,7 @@ const formatProjectUpdateMessage = (
 };
 
 const formatCycleMessage = (action: string, data: LinearCycle): ParsedEvent => {
-  const { name, number, startsAt, endsAt, team } = data;
+  const { name, number, team } = data;
 
   if (action === "create") {
     return {
@@ -242,12 +241,17 @@ const formatCycleMessage = (action: string, data: LinearCycle): ParsedEvent => {
   return createUnsupportedEvent(`Unsupported cycle action: ${action}`);
 };
 
-const formatDocumentMessage = (action: string, data: LinearDocument): ParsedEvent => {
+const formatDocumentMessage = (
+  action: string,
+  data: LinearDocument
+): ParsedEvent => {
   const { title, project, creator } = data;
 
   if (action === "create") {
     return {
-      message: `📄 **New Document:** ${title}\n**Project:** ${project?.name || "None"}\n**Creator:** ${creator?.name}`,
+      message: `📄 **New Document:** ${title}\n**Project:** ${
+        project?.name || "None"
+      }\n**Creator:** ${creator?.name}`,
       priority: EventPriority.LOW,
       shouldSend: true,
     };
@@ -256,12 +260,17 @@ const formatDocumentMessage = (action: string, data: LinearDocument): ParsedEven
   return createUnsupportedEvent(`Document ${action} events are ignored`);
 };
 
-const formatInitiativeMessage = (action: string, data: LinearInitiative): ParsedEvent => {
+const formatInitiativeMessage = (
+  action: string,
+  data: LinearInitiative
+): ParsedEvent => {
   const { name, description } = data;
 
   if (action === "create") {
     return {
-      message: `🎯 **New Initiative:** ${name}${description ? `\n${truncateText(description, 100)}` : ""}`,
+      message: `🎯 **New Initiative:** ${name}${
+        description ? `\n${truncateText(description, 100)}` : ""
+      }`,
       priority: EventPriority.HIGH,
       shouldSend: true,
     };
@@ -270,21 +279,31 @@ const formatInitiativeMessage = (action: string, data: LinearInitiative): Parsed
   return createUnsupportedEvent(`Initiative ${action} events are ignored`);
 };
 
-const formatInitiativeUpdateMessage = (action: string, data: LinearInitiativeUpdate): ParsedEvent => {
+const formatInitiativeUpdateMessage = (
+  action: string,
+  data: LinearInitiativeUpdate
+): ParsedEvent => {
   const { initiative, user, body } = data;
 
   if (action === "create") {
     return {
-      message: `🎯 **Initiative Update:** ${initiative?.name}\n**Author:** ${user?.name}${body ? `\n${truncateText(body)}` : ""}`,
+      message: `🎯 **Initiative Update:** ${initiative?.name}\n**Author:** ${
+        user?.name
+      }${body ? `\n${truncateText(body)}` : ""}`,
       priority: EventPriority.MEDIUM,
       shouldSend: true,
     };
   }
 
-  return createUnsupportedEvent(`Initiative update ${action} events are ignored`);
+  return createUnsupportedEvent(
+    `Initiative update ${action} events are ignored`
+  );
 };
 
-const formatIssueAttachmentMessage = (action: string, data: LinearIssueAttachment): ParsedEvent => {
+const formatIssueAttachmentMessage = (
+  action: string,
+  data: LinearIssueAttachment
+): ParsedEvent => {
   const { title, issue, creator } = data;
 
   if (action === "create") {
@@ -298,7 +317,10 @@ const formatIssueAttachmentMessage = (action: string, data: LinearIssueAttachmen
   return createUnsupportedEvent(`Attachment ${action} events are ignored`);
 };
 
-const formatIssueLabelMessage = (action: string, data: LinearIssueLabel): ParsedEvent => {
+const formatIssueLabelMessage = (
+  action: string,
+  data: LinearIssueLabel
+): ParsedEvent => {
   const { name, team } = data;
 
   if (action === "create") {
@@ -312,12 +334,15 @@ const formatIssueLabelMessage = (action: string, data: LinearIssueLabel): Parsed
   return createUnsupportedEvent(`Label ${action} events are ignored`);
 };
 
-const formatReactionMessage = (action: string, data: LinearReaction): ParsedEvent => {
+const formatReactionMessage = (): ParsedEvent => {
   // Reactions are usually too noisy for Discord
   return createUnsupportedEvent(`Reaction events are ignored`);
 };
 
-const formatCustomerMessage = (action: string, data: LinearCustomer): ParsedEvent => {
+const formatCustomerMessage = (
+  action: string,
+  data: LinearCustomer
+): ParsedEvent => {
   const { name, email } = data;
 
   if (action === "create") {
@@ -331,18 +356,25 @@ const formatCustomerMessage = (action: string, data: LinearCustomer): ParsedEven
   return createUnsupportedEvent(`Customer ${action} events are ignored`);
 };
 
-const formatCustomerRequestMessage = (action: string, data: LinearCustomerRequest): ParsedEvent => {
+const formatCustomerRequestMessage = (
+  action: string,
+  data: LinearCustomerRequest
+): ParsedEvent => {
   const { customer, issue, title } = data;
 
   if (action === "create") {
     return {
-      message: `📮 **Customer Request:** ${title || issue?.title}\n**Customer:** ${customer?.name}\n**Issue:** ${issue?.title}`,
+      message: `📮 **Customer Request:** ${
+        title || issue?.title
+      }\n**Customer:** ${customer?.name}\n**Issue:** ${issue?.title}`,
       priority: EventPriority.HIGH,
       shouldSend: true,
     };
   }
 
-  return createUnsupportedEvent(`Customer request ${action} events are ignored`);
+  return createUnsupportedEvent(
+    `Customer request ${action} events are ignored`
+  );
 };
 
 const formatUserMessage = (action: string, data: LinearUser): ParsedEvent => {
@@ -359,8 +391,11 @@ const formatUserMessage = (action: string, data: LinearUser): ParsedEvent => {
   return createUnsupportedEvent(`User ${action} events are ignored`);
 };
 
-const formatIssueSLAMessage = (action: string, data: LinearIssueSLA): ParsedEvent => {
-  const { issue, breachesAt, status } = data;
+const formatIssueSLAMessage = (
+  action: string,
+  data: LinearIssueSLA
+): ParsedEvent => {
+  const { issue, breachesAt } = data;
 
   switch (action) {
     case "set":
@@ -386,7 +421,7 @@ const formatIssueSLAMessage = (action: string, data: LinearIssueSLA): ParsedEven
   }
 };
 
-const formatOAuthRevokedMessage = (action: string, data: any): ParsedEvent => {
+const formatOAuthRevokedMessage = (): ParsedEvent => {
   return {
     message: `🔐 **OAuth App Access Revoked** - Please check your Linear integration settings`,
     priority: EventPriority.HIGH,
