@@ -15,31 +15,14 @@ export const env = (): z.infer<typeof envSchema> => {
   return cachedEnv;
 };
 
+// Lenient on purpose: Linear adds new event types over time, and some events
+// (Reaction, OAuthAppRevoked, etc.) omit fields like `url`. We accept anything
+// shaped roughly like a Linear webhook and let formatEvent decide.
 export const WebhookPayloadSchema = z.object({
-  action: z.enum(["create", "update", "remove", "set", "highRisk", "breached"]),
-  type: z.enum([
-    "Issue",
-    "Comment",
-    "Project",
-    "ProjectUpdate",
-    "IssueAttachment",
-    "IssueLabel",
-    "Reaction",
-    "Document",
-    "Initiative",
-    "InitiativeUpdate",
-    "Cycle",
-    "Customer",
-    "CustomerRequest",
-    "User",
-    "IssueSLA",
-    "OAuthAppRevoked",
-  ]),
-  createdAt: z.string(),
-  data: z.record(z.string(), z.unknown()),
-  url: z.string(),
-  organizationId: z.string(),
-  webhookTimestamp: z.number(),
+  action: z.string(),
+  type: z.string(),
+  data: z.record(z.string(), z.unknown()).optional(),
+  url: z.string().optional(),
   updatedFrom: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -59,13 +42,14 @@ export const verifyLinearSignature = (
 
 const truncate = (s: string, n = 200) => (s.length <= n ? s : `${s.slice(0, n)}...`);
 
-const PRIORITY_NAME: Record<number, string> = {
-  0: "No priority",
-  1: "Urgent",
-  2: "High",
-  3: "Medium",
-  4: "Low",
-};
+const link = (text: string | undefined, url: string | undefined) =>
+  text && url ? `[${text}](${url})` : (text ?? "");
+
+const blockquote = (s: string) =>
+  s
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
 
 const HEALTH_EMOJI: Record<string, string> = {
   onTrack: "🟢",
@@ -75,97 +59,76 @@ const HEALTH_EMOJI: Record<string, string> = {
 };
 
 // Returns the Discord message string, or null if the event should be skipped.
-// Skipped: Reaction, IssueAttachment, IssueLabel (too noisy), and any unknown type/action combo.
+// Skipped: noisy events (Reaction, IssueAttachment, IssueLabel, label-only updates),
+// Issue updates that don't change state/assignee/title, and any unknown type/action.
 export function formatEvent(p: WebhookPayload): string | null {
-  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous payload shape, validated by Zod above.
-  const d = p.data as any;
-  const key = `${p.type}:${p.action}`;
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous payload shape, validated as a webhook above.
+  const d = (p.data ?? {}) as any;
+  const url = p.url;
 
-  switch (key) {
-    case "Issue:create": {
-      const id = `${d.team?.key}-${d.number ?? 0}`;
-      return [
-        `🆕 **New Issue Created**`,
-        `**${id}**: ${d.title}`,
-        `**Priority**: ${PRIORITY_NAME[d.priority] ?? "Unknown"}`,
-        `**Assignee**: ${d.assignee?.name ?? "Unassigned"}`,
-        `**Creator**: ${d.creator?.name}`,
-      ].join("\n");
-    }
+  switch (`${p.type}:${p.action}`) {
+    case "Issue:create":
+      return `New issue created: ${link(d.title, url)}`;
+
     case "Issue:update": {
-      const id = `${d.team?.key}-${d.number ?? 0}`;
-      return [
-        `📝 **Issue Updated**`,
-        `**${id}**: ${d.title}`,
-        `**Status**: ${d.state?.name}`,
-        `**Assignee**: ${d.assignee?.name ?? "Unassigned"}`,
-      ].join("\n");
+      const changed = p.updatedFrom ?? {};
+      if ("stateId" in changed) {
+        return `Issue updated: ${link(d.title, url)} status changed to **${d.state?.name}**`;
+      }
+      if ("assigneeId" in changed) {
+        return d.assignee?.name
+          ? `Issue ${link(d.title, url)} assigned to ${d.assignee.name}`
+          : `Issue ${link(d.title, url)} unassigned`;
+      }
+      if ("title" in changed) {
+        return `Title updated from *${changed.title}* to ${link(d.title, url)}`;
+      }
+      return null;
     }
 
-    case "Comment:create":
-      return [
-        `💬 **New Comment**`,
-        `**Issue**: ${d.issue?.title}`,
-        `**Author**: ${d.user?.name}`,
-        `**Comment**: ${truncate(d.body ?? "")}`,
-      ].join("\n");
-
-    case "Project:create": {
-      const lines = [`📊 **New Project Created:** ${d.name}`];
-      if (d.lead?.name) lines.push(`**Lead:** ${d.lead.name}`);
-      if (d.description) lines.push(`**Description:** ${truncate(d.description, 100)}`);
-      return lines.join("\n");
+    case "Comment:create": {
+      const issueUrl = d.issue?.url ?? url;
+      const body = blockquote(truncate(d.body ?? "", 1000));
+      return `${d.user?.name} commented on ${link(d.issue?.title, issueUrl)}:\n${body}`;
     }
-    case "Project:update":
-      return `📊 **Project Updated:** ${d.name}`;
+
+    case "Project:create":
+      return `New project created: ${link(d.name, url)}`;
 
     case "ProjectUpdate:create": {
-      const emoji = HEALTH_EMOJI[d.health] ?? "⚪";
-      const lines = [
-        `${emoji} **Project Update:** ${d.project?.name}`,
-        `**Author:** ${d.user?.name}`,
-        `**Status:** ${d.health}`,
-      ];
-      if (d.body) lines.push(`**Update:** ${truncate(d.body.replace(/\n/g, " ").trim())}`);
-      return lines.join("\n");
-    }
-    case "ProjectUpdate:update": {
-      const emoji = HEALTH_EMOJI[d.health] ?? "⚪";
-      return `${emoji} **Project Update Modified:** ${d.project?.name} by ${d.user?.name}`;
+      const emoji = HEALTH_EMOJI[d.health];
+      const head = `${emoji ? `${emoji} ` : ""}Project update on ${link(d.project?.name, url)} by ${d.user?.name}`;
+      return d.body ? `${head}:\n${blockquote(truncate(d.body, 500))}` : head;
     }
 
     case "Cycle:create":
-      return `🔄 **New Cycle Created:** ${d.team?.name} - ${d.name} (${d.number})`;
-    case "Cycle:update":
-      return `🔄 **Cycle Updated:** ${d.team?.name} - ${d.name}`;
+      return `New cycle: ${d.team?.name} ${link(d.name, url)}`;
 
     case "Document:create":
-      return `📄 **New Document:** ${d.title}\n**Project:** ${d.project?.name ?? "None"}\n**Creator:** ${d.creator?.name}`;
+      return `New document: ${link(d.title, url)}`;
 
     case "Initiative:create":
-      return `🎯 **New Initiative:** ${d.name}${d.description ? `\n${truncate(d.description, 100)}` : ""}`;
+      return `New initiative: ${link(d.name, url)}`;
 
     case "InitiativeUpdate:create":
-      return `🎯 **Initiative Update:** ${d.initiative?.name}\n**Author:** ${d.user?.name}${d.body ? `\n${truncate(d.body)}` : ""}`;
+      return `Initiative update on ${d.initiative?.name} by ${d.user?.name}`;
 
     case "Customer:create":
-      return `👤 **New Customer:** ${d.name} (${d.email})`;
+      return `New customer: ${d.name}${d.email ? ` (${d.email})` : ""}`;
 
     case "CustomerRequest:create":
-      return `📮 **Customer Request:** ${d.title || d.issue?.title}\n**Customer:** ${d.customer?.name}\n**Issue:** ${d.issue?.title}`;
+      return `New customer request: ${d.title || d.issue?.title} (from ${d.customer?.name})`;
 
     case "User:create":
-      return `👋 **New Team Member:** ${d.name} joined the workspace`;
+      return `New team member: ${d.name} joined`;
 
-    case "IssueSLA:set":
-      return `⏰ **SLA Set:** ${d.issue?.title}\n**Breaches at:** ${d.breachesAt}`;
     case "IssueSLA:highRisk":
-      return `⚠️ **SLA High Risk:** ${d.issue?.title} is at risk of breaching SLA`;
+      return `⚠️ SLA at risk: ${link(d.issue?.title, d.issue?.url)}`;
     case "IssueSLA:breached":
-      return `🚨 **SLA BREACHED:** ${d.issue?.title} has breached its SLA`;
+      return `🚨 SLA breached: ${link(d.issue?.title, d.issue?.url)}`;
 
     case "OAuthAppRevoked:remove":
-      return `🔐 **OAuth App Access Revoked** - Please check your Linear integration settings`;
+      return `🔐 OAuth app access revoked — check Linear integration settings`;
 
     default:
       return null;

@@ -49,88 +49,174 @@ const payload = (overrides: Partial<WebhookPayload>): WebhookPayload =>
   WebhookPayloadSchema.parse({
     action: "create",
     type: "Issue",
-    createdAt: "2026-04-28T00:00:00.000Z",
     url: "https://linear.app/team/issue/ENG-1",
-    organizationId: "org-1",
-    webhookTimestamp: 1745798400000,
     data: {},
     ...overrides,
   });
 
+const ISSUE_URL = "https://linear.app/team/issue/ENG-42";
+
+describe("WebhookPayloadSchema", () => {
+  it("accepts payloads with no url (some Linear events omit it)", () => {
+    const result = WebhookPayloadSchema.safeParse({
+      action: "create",
+      type: "Reaction",
+      data: {},
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts unknown event types (Linear adds new ones over time)", () => {
+    const result = WebhookPayloadSchema.safeParse({
+      action: "create",
+      type: "AgentSession",
+      data: {},
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
 describe("formatEvent", () => {
-  it("formats Issue create with priority and assignee", () => {
-    const msg = formatEvent(
-      payload({
-        type: "Issue",
-        action: "create",
-        data: {
-          title: "Login broken",
-          number: 42,
-          team: { key: "ENG" },
-          priority: 2,
-          assignee: { name: "Alice" },
-          creator: { name: "Bob" },
-        },
-      })
-    );
-    expect(msg).toContain("New Issue Created");
-    expect(msg).toContain("ENG-42");
-    expect(msg).toContain("Login broken");
-    expect(msg).toContain("High");
-    expect(msg).toContain("Alice");
-    expect(msg).toContain("Bob");
+  it("formats Issue create as a one-liner with a link", () => {
+    expect(
+      formatEvent(
+        payload({
+          type: "Issue",
+          action: "create",
+          url: ISSUE_URL,
+          data: { title: "Login broken" },
+        })
+      )
+    ).toBe(`New issue created: [Login broken](${ISSUE_URL})`);
   });
 
-  it("falls back to Unassigned when assignee is missing", () => {
-    const msg = formatEvent(
-      payload({
-        type: "Issue",
-        action: "create",
-        data: {
-          title: "x",
-          number: 1,
-          team: { key: "ENG" },
-          priority: 4,
-          creator: { name: "Bob" },
-        },
-      })
-    );
-    expect(msg).toContain("Unassigned");
+  it("posts on state change and includes the new state", () => {
+    expect(
+      formatEvent(
+        payload({
+          type: "Issue",
+          action: "update",
+          url: ISSUE_URL,
+          data: { title: "Login broken", state: { name: "Done" } },
+          updatedFrom: { stateId: "old-state-id" },
+        })
+      )
+    ).toBe(`Issue updated: [Login broken](${ISSUE_URL}) status changed to **Done**`);
   });
 
-  it("formats Comment create with truncated body", () => {
-    const longBody = "a".repeat(250);
+  it("posts on assignee change with the new assignee", () => {
+    expect(
+      formatEvent(
+        payload({
+          type: "Issue",
+          action: "update",
+          url: ISSUE_URL,
+          data: { title: "Login broken", assignee: { name: "Alice" } },
+          updatedFrom: { assigneeId: null },
+        })
+      )
+    ).toBe(`Issue [Login broken](${ISSUE_URL}) assigned to Alice`);
+  });
+
+  it("posts on unassign", () => {
+    expect(
+      formatEvent(
+        payload({
+          type: "Issue",
+          action: "update",
+          url: ISSUE_URL,
+          data: { title: "Login broken" },
+          updatedFrom: { assigneeId: "prev-user-id" },
+        })
+      )
+    ).toBe(`Issue [Login broken](${ISSUE_URL}) unassigned`);
+  });
+
+  it("posts on title change with the previous title", () => {
+    expect(
+      formatEvent(
+        payload({
+          type: "Issue",
+          action: "update",
+          url: ISSUE_URL,
+          data: { title: "New title" },
+          updatedFrom: { title: "Old title" },
+        })
+      )
+    ).toBe(`Title updated from *Old title* to [New title](${ISSUE_URL})`);
+  });
+
+  it("skips Issue updates that don't touch state/assignee/title", () => {
+    expect(
+      formatEvent(
+        payload({
+          type: "Issue",
+          action: "update",
+          url: ISSUE_URL,
+          data: { title: "x" },
+          updatedFrom: { labelIds: ["a", "b"] },
+        })
+      )
+    ).toBeNull();
+  });
+
+  it("skips Issue updates with no updatedFrom (no-op update)", () => {
+    expect(
+      formatEvent(
+        payload({ type: "Issue", action: "update", url: ISSUE_URL, data: { title: "x" } })
+      )
+    ).toBeNull();
+  });
+
+  it("formats Comment create with author, link, and blockquote body", () => {
     const msg = formatEvent(
       payload({
         type: "Comment",
         action: "create",
-        data: { body: longBody, user: { name: "Alice" }, issue: { title: "Login broken" } },
+        url: "https://linear.app/team/issue/ENG-1#comment-1",
+        data: {
+          body: "merging now\nlooks good",
+          user: { name: "Jamie Wilkinson" },
+          issue: { title: "Login broken", url: ISSUE_URL },
+        },
       })
     );
-    expect(msg).toContain("New Comment");
-    expect(msg).toContain("Alice");
-    expect(msg).toContain("Login broken");
-    expect(msg).toContain("...");
-    expect(msg).not.toContain("a".repeat(250));
+    expect(msg).toBe(
+      `Jamie Wilkinson commented on [Login broken](${ISSUE_URL}):\n> merging now\n> looks good`
+    );
   });
 
-  it("formats Project create", () => {
+  it("truncates long comment bodies", () => {
     const msg = formatEvent(
       payload({
-        type: "Project",
+        type: "Comment",
         action: "create",
-        data: { name: "Q3 Launch", lead: { name: "Carol" }, description: "Ship it." },
+        data: {
+          body: "a".repeat(2000),
+          user: { name: "Alice" },
+          issue: { title: "x", url: ISSUE_URL },
+        },
       })
     );
-    expect(msg).toContain("Q3 Launch");
-    expect(msg).toContain("Carol");
+    expect(msg).toContain("...");
+    expect(msg).not.toContain("a".repeat(2000));
   });
 
-  it("formats ProjectUpdate with health emoji", () => {
+  it("formats Project create as a one-liner", () => {
+    const projectUrl = "https://linear.app/team/project/q3-launch";
+    expect(
+      formatEvent(
+        payload({ type: "Project", action: "create", url: projectUrl, data: { name: "Q3 Launch" } })
+      )
+    ).toBe(`New project created: [Q3 Launch](${projectUrl})`);
+  });
+
+  it("formats ProjectUpdate create with health emoji and blockquoted body", () => {
     const msg = formatEvent(
       payload({
         type: "ProjectUpdate",
         action: "create",
+        url: "https://linear.app/team/project/q3-launch",
         data: {
           project: { name: "Q3 Launch" },
           user: { name: "Carol" },
@@ -141,50 +227,19 @@ describe("formatEvent", () => {
     );
     expect(msg).toContain("🟡");
     expect(msg).toContain("Q3 Launch");
-    expect(msg).toContain("Slipping by a week.");
+    expect(msg).toContain("Carol");
+    expect(msg).toContain("> Slipping by a week.");
   });
 
-  it("formats Cycle create", () => {
+  it("formats SLA breached with the issue link", () => {
     const msg = formatEvent(
       payload({
-        type: "Cycle",
-        action: "create",
-        data: { name: "Sprint 5", number: 5, team: { name: "Engineering" } },
+        type: "IssueSLA",
+        action: "breached",
+        data: { issue: { title: "Login broken", url: ISSUE_URL } },
       })
     );
-    expect(msg).toContain("Sprint 5");
-    expect(msg).toContain("Engineering");
-  });
-
-  it("formats Document create", () => {
-    const msg = formatEvent(
-      payload({
-        type: "Document",
-        action: "create",
-        data: { title: "RFC", project: { name: "Q3 Launch" }, creator: { name: "Dave" } },
-      })
-    );
-    expect(msg).toContain("RFC");
-    expect(msg).toContain("Dave");
-  });
-
-  it("formats Initiative create", () => {
-    const msg = formatEvent(
-      payload({
-        type: "Initiative",
-        action: "create",
-        data: { name: "Reliability", description: "Reduce error rate." },
-      })
-    );
-    expect(msg).toContain("Reliability");
-  });
-
-  it("formats SLA breached with severity emoji", () => {
-    const msg = formatEvent(
-      payload({ type: "IssueSLA", action: "breached", data: { issue: { title: "Login broken" } } })
-    );
-    expect(msg).toContain("🚨");
-    expect(msg).toContain("Login broken");
+    expect(msg).toBe(`🚨 SLA breached: [Login broken](${ISSUE_URL})`);
   });
 
   it("formats OAuthAppRevoked", () => {
@@ -198,19 +253,17 @@ describe("formatEvent", () => {
 
   it("returns null for IssueAttachment events (too noisy)", () => {
     expect(
-      formatEvent(
-        payload({
-          type: "IssueAttachment",
-          action: "create",
-          data: { title: "screenshot.png", issue: { title: "x" }, creator: { name: "Alice" } },
-        })
-      )
+      formatEvent(payload({ type: "IssueAttachment", action: "create", data: {} }))
     ).toBeNull();
   });
 
-  it("returns null for an unsupported action on a known type", () => {
+  it("returns null for unknown event types instead of crashing", () => {
+    expect(formatEvent(payload({ type: "AgentSession", action: "create", data: {} }))).toBeNull();
+  });
+
+  it("returns null for Project:update (too generic to be useful)", () => {
     expect(
-      formatEvent(payload({ type: "Issue", action: "remove", data: { number: 1 } }))
+      formatEvent(payload({ type: "Project", action: "update", data: { name: "x" } }))
     ).toBeNull();
   });
 });
