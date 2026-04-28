@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { formatDiscordMessage, parseLinearWebhook, shouldNotifyDiscord } from "./linear-parser";
-import { EventPriority, type WebhookPayload } from "./linear-types";
+import { EventPriority, type WebhookPayload, WebhookPayloadSchema } from "./linear-types";
 
-const basePayload = (overrides: Partial<WebhookPayload>): unknown => ({
-  action: "create",
-  type: "Issue",
-  createdAt: "2026-04-28T00:00:00.000Z",
-  url: "https://linear.app/team/issue/ENG-1",
-  organizationId: "org-1",
-  webhookTimestamp: 1745798400000,
-  data: {},
-  ...overrides,
-});
+const basePayload = (overrides: Partial<WebhookPayload>): WebhookPayload =>
+  WebhookPayloadSchema.parse({
+    action: "create",
+    type: "Issue",
+    createdAt: "2026-04-28T00:00:00.000Z",
+    url: "https://linear.app/team/issue/ENG-1",
+    organizationId: "org-1",
+    webhookTimestamp: 1745798400000,
+    data: {},
+    ...overrides,
+  });
 
 describe("parseLinearWebhook", () => {
   it("formats an Issue create with priority and assignee", () => {
@@ -199,8 +200,10 @@ describe("parseLinearWebhook", () => {
     expect(shouldNotifyDiscord(event)).toBe(false);
   });
 
-  it("returns IGNORE for malformed payloads", () => {
-    const event = parseLinearWebhook({ not: "a webhook" });
+  it("returns IGNORE for an unsupported action on a known type", () => {
+    const event = parseLinearWebhook(
+      basePayload({ type: "Issue", action: "remove", data: { number: 1 } })
+    );
     expect(event.priority).toBe(EventPriority.IGNORE);
     expect(event.shouldSend).toBe(false);
   });

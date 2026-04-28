@@ -13,25 +13,17 @@ import {
   type LinearIssueSLA,
   type LinearProject,
   type LinearProjectUpdate,
-  type LinearTeam,
   type LinearUser,
   type ParsedEvent,
   PRIORITY_LABELS,
   type WebhookPayload,
-  WebhookPayloadSchema,
 } from "./linear-types";
 
-// Helper functions
 const createUnsupportedEvent = (message: string): ParsedEvent => ({
   message,
   priority: EventPriority.IGNORE,
   shouldSend: false,
 });
-
-const getIssueId = (team: LinearTeam | undefined, number: number): string =>
-  `${team?.key}-${number}`;
-const getAssigneeName = (assignee: LinearUser | undefined): string =>
-  assignee?.name || "Unassigned";
 
 const getHealthEmoji = (health: string): string => {
   switch (health) {
@@ -48,25 +40,10 @@ const getHealthEmoji = (health: string): string => {
   }
 };
 
-const truncateText = (text: string, maxLength: number = 200): string => {
-  if (text.length <= maxLength) return text;
-  return `${text.substring(0, maxLength)}...`;
-};
+const truncateText = (text: string, maxLength: number = 200): string =>
+  text.length <= maxLength ? text : `${text.substring(0, maxLength)}...`;
 
-// Simple webhook parser using Linear SDK patterns
-export const parseLinearWebhook = (payload: unknown): ParsedEvent => {
-  try {
-    // Validate payload structure with Zod
-    const validatedPayload = WebhookPayloadSchema.parse(payload);
-
-    return routeLinearEvent(validatedPayload);
-  } catch (error) {
-    console.error("Invalid webhook payload:", error);
-    return createUnsupportedEvent("Invalid webhook payload");
-  }
-};
-
-const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
+export const parseLinearWebhook = (payload: WebhookPayload): ParsedEvent => {
   const { action, type, data } = payload;
 
   switch (type) {
@@ -109,15 +86,12 @@ const routeLinearEvent = (payload: WebhookPayload): ParsedEvent => {
 
 const formatIssueMessage = (action: string, data: LinearIssue): ParsedEvent => {
   const { title, number, team, state, priority, assignee, creator } = data;
-  const issueId = getIssueId(team, number || 0);
-  const assigneeName = getAssigneeName(assignee);
+  const issueId = `${team?.key}-${number || 0}`;
+  const assigneeName = assignee?.name || "Unassigned";
 
   switch (action) {
     case "create": {
-      const priorityLabel =
-        priority !== undefined && priority >= 0 && priority <= 4
-          ? PRIORITY_LABELS[priority as 0 | 1 | 2 | 3 | 4]
-          : "Unknown";
+      const priorityLabel = priority !== undefined ? PRIORITY_LABELS[priority] : "Unknown";
       return {
         message: `🆕 **New Issue Created**\n**${issueId}**: ${title}\n**Priority**: ${priorityLabel}\n**Assignee**: ${assigneeName}\n**Creator**: ${creator?.name}`,
         priority: (priority || 4) <= 2 ? EventPriority.HIGH : EventPriority.MEDIUM,
@@ -143,10 +117,9 @@ const formatCommentMessage = (action: string, data: LinearComment): ParsedEvent 
   }
 
   const { body, user, issue } = data;
-  const truncatedBody = body && body.length > 200 ? `${body.slice(0, 200)}...` : body || "";
 
   return {
-    message: `💬 **New Comment**\n**Issue**: ${issue?.title}\n**Author**: ${user?.name}\n**Comment**: ${truncatedBody}`,
+    message: `💬 **New Comment**\n**Issue**: ${issue?.title}\n**Author**: ${user?.name}\n**Comment**: ${truncateText(body || "")}`,
     priority: EventPriority.MEDIUM,
     shouldSend: true,
   };
@@ -290,7 +263,8 @@ const formatIssueAttachmentMessage = (action: string, data: LinearIssueAttachmen
     return {
       message: `📎 **Attachment Added:** ${title}\n**Issue:** ${issue?.title}\n**By:** ${creator?.name}`,
       priority: EventPriority.LOW,
-      shouldSend: false, // Usually too noisy
+      // Attachments are too noisy.
+      shouldSend: false,
     };
   }
 
@@ -304,17 +278,17 @@ const formatIssueLabelMessage = (action: string, data: LinearIssueLabel): Parsed
     return {
       message: `🏷️ **New Label Created:** ${name} in ${team?.name}`,
       priority: EventPriority.LOW,
-      shouldSend: false, // Administrative, usually not needed
+      // Administrative noise, not worth pinging.
+      shouldSend: false,
     };
   }
 
   return createUnsupportedEvent(`Label ${action} events are ignored`);
 };
 
-const formatReactionMessage = (): ParsedEvent => {
-  // Reactions are usually too noisy for Discord
-  return createUnsupportedEvent(`Reaction events are ignored`);
-};
+// Reactions are too noisy for Discord, always ignore.
+const formatReactionMessage = (): ParsedEvent =>
+  createUnsupportedEvent(`Reaction events are ignored`);
 
 const formatCustomerMessage = (action: string, data: LinearCustomer): ParsedEvent => {
   const { name, email } = data;
@@ -387,22 +361,18 @@ const formatIssueSLAMessage = (action: string, data: LinearIssueSLA): ParsedEven
   }
 };
 
-const formatOAuthRevokedMessage = (): ParsedEvent => {
-  return {
-    message: `🔐 **OAuth App Access Revoked** - Please check your Linear integration settings`,
-    priority: EventPriority.HIGH,
-    shouldSend: true,
-  };
-};
+const formatOAuthRevokedMessage = (): ParsedEvent => ({
+  message: `🔐 **OAuth App Access Revoked** - Please check your Linear integration settings`,
+  priority: EventPriority.HIGH,
+  shouldSend: true,
+});
 
-export const shouldNotifyDiscord = (event: ParsedEvent): boolean => {
-  return event.shouldSend && event.priority !== EventPriority.IGNORE;
-};
+export const shouldNotifyDiscord = (event: ParsedEvent): boolean =>
+  event.shouldSend && event.priority !== EventPriority.IGNORE;
 
 export const formatDiscordMessage = (event: ParsedEvent): string => {
   if (!shouldNotifyDiscord(event)) return "";
 
-  // Add timestamp for high priority events
   if (event.priority === EventPriority.HIGH) {
     const timestamp = new Date().toLocaleTimeString("en-US", {
       hour: "2-digit",

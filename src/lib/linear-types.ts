@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-// Zod schemas for webhook payload validation
 export const WebhookPayloadSchema = z.object({
   action: z.enum(["create", "update", "remove", "set", "highRisk", "breached"]),
   type: z.enum([
@@ -31,7 +30,6 @@ export const WebhookPayloadSchema = z.object({
 
 export type WebhookPayload = z.infer<typeof WebhookPayloadSchema>;
 
-// Event priority levels
 export enum EventPriority {
   HIGH = "high",
   MEDIUM = "medium",
@@ -39,14 +37,12 @@ export enum EventPriority {
   IGNORE = "ignore",
 }
 
-// Parsed event result
 export interface ParsedEvent {
   message: string;
   priority: EventPriority;
   shouldSend: boolean;
 }
 
-// Simple mapping of Linear priority numbers to labels
 export const PRIORITY_LABELS = {
   0: "No priority",
   1: "Urgent",
@@ -57,7 +53,6 @@ export const PRIORITY_LABELS = {
 
 export type LinearPriority = keyof typeof PRIORITY_LABELS;
 
-// Linear entity types based on webhook data structure
 export interface LinearTeam {
   key?: string;
   name?: string;
@@ -65,12 +60,10 @@ export interface LinearTeam {
 
 export interface LinearUser {
   name?: string;
-  id?: string;
 }
 
 export interface LinearState {
   name?: string;
-  id?: string;
 }
 
 export interface LinearIssue {
@@ -105,8 +98,6 @@ export interface LinearProjectUpdate {
 export interface LinearCycle {
   name?: string;
   number?: number;
-  startsAt?: string;
-  endsAt?: string;
   team?: LinearTeam;
 }
 
@@ -129,21 +120,13 @@ export interface LinearInitiativeUpdate {
 
 export interface LinearIssueAttachment {
   title?: string;
-  url?: string;
   issue?: LinearIssue;
   creator?: LinearUser;
 }
 
 export interface LinearIssueLabel {
   name?: string;
-  color?: string;
   team?: LinearTeam;
-}
-
-export interface LinearReaction {
-  emoji?: string;
-  user?: LinearUser;
-  comment?: LinearComment;
 }
 
 export interface LinearCustomer {
@@ -160,5 +143,4 @@ export interface LinearCustomerRequest {
 export interface LinearIssueSLA {
   issue?: LinearIssue;
   breachesAt?: string;
-  status?: string;
 }
