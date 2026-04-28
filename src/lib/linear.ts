@@ -72,18 +72,18 @@ export function formatEvent(p: WebhookPayload): string | null {
 
     case "Issue:update": {
       const changed = p.updatedFrom ?? {};
-      if ("stateId" in changed) {
-        return `Issue updated: ${link(d.title, url)} status changed to **${d.state?.name}**`;
+      const lines: string[] = [];
+      if ("stateId" in changed && d.state?.name) {
+        lines.push(`Status: → **${d.state.name}**`);
       }
       if ("assigneeId" in changed) {
-        return d.assignee?.name
-          ? `Issue ${link(d.title, url)} assigned to ${d.assignee.name}`
-          : `Issue ${link(d.title, url)} unassigned`;
+        lines.push(d.assignee?.name ? `Assignee: → ${d.assignee.name}` : `Unassigned`);
       }
       if ("title" in changed) {
-        return `Title updated from *${changed.title}* to ${link(d.title, url)}`;
+        lines.push(`Title: *${changed.title}* → ${d.title}`);
       }
-      return null;
+      if (lines.length === 0) return null;
+      return `Issue updated: ${link(d.title, url)}\n${blockquote(lines.join("\n"))}`;
     }
 
     case "Comment:create": {

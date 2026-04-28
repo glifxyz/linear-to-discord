@@ -101,7 +101,7 @@ describe("formatEvent", () => {
           updatedFrom: { stateId: "old-state-id" },
         })
       )
-    ).toBe(`Issue updated: [Login broken](${ISSUE_URL}) status changed to **Done**`);
+    ).toBe(`Issue updated: [Login broken](${ISSUE_URL})\n> Status: → **Done**`);
   });
 
   it("posts on assignee change with the new assignee", () => {
@@ -115,7 +115,7 @@ describe("formatEvent", () => {
           updatedFrom: { assigneeId: null },
         })
       )
-    ).toBe(`Issue [Login broken](${ISSUE_URL}) assigned to Alice`);
+    ).toBe(`Issue updated: [Login broken](${ISSUE_URL})\n> Assignee: → Alice`);
   });
 
   it("posts on unassign", () => {
@@ -129,7 +129,7 @@ describe("formatEvent", () => {
           updatedFrom: { assigneeId: "prev-user-id" },
         })
       )
-    ).toBe(`Issue [Login broken](${ISSUE_URL}) unassigned`);
+    ).toBe(`Issue updated: [Login broken](${ISSUE_URL})\n> Unassigned`);
   });
 
   it("posts on title change with the previous title", () => {
@@ -143,7 +143,33 @@ describe("formatEvent", () => {
           updatedFrom: { title: "Old title" },
         })
       )
-    ).toBe(`Title updated from *Old title* to [New title](${ISSUE_URL})`);
+    ).toBe(`Issue updated: [New title](${ISSUE_URL})\n> Title: *Old title* → New title`);
+  });
+
+  it("combines multiple field changes from one webhook into a single message", () => {
+    const msg = formatEvent(
+      payload({
+        type: "Issue",
+        action: "update",
+        url: ISSUE_URL,
+        data: {
+          title: "New title",
+          state: { name: "In Progress" },
+          assignee: { name: "Bob" },
+        },
+        updatedFrom: {
+          stateId: "old-state-id",
+          assigneeId: "old-user-id",
+          title: "Old title",
+        },
+      })
+    );
+    expect(msg).toBe(
+      `Issue updated: [New title](${ISSUE_URL})\n` +
+        `> Status: → **In Progress**\n` +
+        `> Assignee: → Bob\n` +
+        `> Title: *Old title* → New title`
+    );
   });
 
   it("skips Issue updates that don't touch state/assignee/title", () => {
