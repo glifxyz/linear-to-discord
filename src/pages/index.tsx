@@ -1,5 +1,3 @@
-const Index = () => {
-  return <p>Linear to Discord</p>;
-};
-
-export default Index;
+export default function Home() {
+  return <pre>linear-to-discord — POST /api/webhook</pre>;
+}

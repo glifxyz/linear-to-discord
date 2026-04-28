@@ -1,34 +1,26 @@
 # 🔌 Linear to Discord
 
-A simple webhook service for sending linear notifications to discord.
+A small webhook service that forwards Linear events to Discord.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvarun-raj%2Flinear-to-discord&env=DISCORD_WEBHOOK&envDescription=Discord%20webhook&envLink=https%3A%2F%2Fsupport.discord.com%2Fhc%2Fen-us%2Farticles%2F228383668-Intro-to-Webhooks&project-name=linear-to-discord&repository-name=linear-to-discord)
+## Setup
 
-## Usage
-
-1. Create a discord webhook in the channel you want to send notifications to. [Guide](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)
-2. Copy the webhook url and add it as an environment variable named `DISCORD_WEBHOOK` in the vercel project.
-3. Deploy the project to vercel.
-4. Add the webhook url to linear. [Guide](https://linear.app/settings/api)
-5. Done! You should now receive notifications in the discord channel.
+1. Create a Discord webhook in your target channel ([guide](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)).
+2. In Linear: Settings → API → Webhooks, create a webhook pointing at `https://<your-deployment>/api/webhook`. Copy the signing secret.
+3. Set Vercel env vars:
+   - `DISCORD_WEBHOOK` — Discord webhook URL (required)
+   - `LINEAR_WEBHOOK_SECRET` — Linear's signing secret (required, used for HMAC verification)
+   - `DISCORD_WEBHOOK_PROJECTS` — optional, separate webhook for `Project` / `ProjectUpdate` events
+4. Deploy. Confirm the Linear webhook is **enabled**.
 
 ## Development
 
-1. Clone the repository.
-2. Install dependencies using `npm install`.
-3. Run the development server using `npm run dev`.
+```sh
+pnpm install
+pnpm dev          # next dev
+pnpm test         # vitest watch
+pnpm test:run     # vitest run
+pnpm lint         # biome check --write
+pnpm typecheck    # tsc --noEmit
+```
 
-
-## Deployment
-You can use the vercel button above to deploy the project to vercel or follow the steps below to deploy it manually.
-
-1. Clone the repository.
-2. Install dependencies using `npm install`.
-3. Run `npm run build` to build the project.
-4. Run `npm run start` to start the server.
-
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-## License
-[MIT](LICENSE)
+Node 22.14.x, pnpm. Linting/formatting via [Biome](https://biomejs.dev/).
