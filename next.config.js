@@ -2,9 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  eslint: {
-    dirs: ["."],
-  },
 };
 
 module.exports = nextConfig;
