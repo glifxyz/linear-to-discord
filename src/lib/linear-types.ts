@@ -22,11 +22,11 @@ export const WebhookPayloadSchema = z.object({
     "OAuthAppRevoked",
   ]),
   createdAt: z.string(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
   url: z.string(),
   organizationId: z.string(),
   webhookTimestamp: z.number(),
-  updatedFrom: z.record(z.unknown()).optional(),
+  updatedFrom: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type WebhookPayload = z.infer<typeof WebhookPayloadSchema>;

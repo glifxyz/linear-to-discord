@@ -1,41 +1,31 @@
 {
   "compilerOptions": {
+    "target": "es2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "module": "esnext",
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "removeComments": true,
-    "preserveConstEnums": true,
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "strict": true,
-    "alwaysStrict": true,
-    "strictNullChecks": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitAny": true,
     "noImplicitReturns": true,
-    "noImplicitThis": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "allowUnreachableCode": false,
     "noFallthroughCasesInSwitch": true,
-    "target": "es5",
-    "outDir": "out",
-    "declaration": true,
-    "sourceMap": true,
+    "allowUnreachableCode": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "allowJs": false,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "jsx": "preserve",
-    "noEmit": true,
     "isolatedModules": true,
     "incremental": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/public/*": ["./public/*"]
-    }
+      "@/*": ["./src/*"]
+    },
+    "allowJs": true
   },
-  "exclude": ["./out/**/*", "./node_modules/**/*"],
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
 }
