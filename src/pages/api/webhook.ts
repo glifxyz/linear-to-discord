@@ -1,14 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { env } from "@/config/env";
-import { sendDiscordMessage } from "@/lib/discord-client";
-import { formatDiscordMessage, parseLinearWebhook, shouldNotifyDiscord } from "@/lib/linear-parser";
-import { WebhookPayloadSchema } from "@/lib/linear-types";
-import { verifyLinearSignature } from "@/lib/verify-signature";
+import {
+  env,
+  formatEvent,
+  isProjectEvent,
+  sendToDiscord,
+  verifyLinearSignature,
+  WebhookPayloadSchema,
+} from "@/lib/linear";
 
-// Disable Next's automatic body parsing so we can verify the signature against the raw bytes.
-export const config = {
-  api: { bodyParser: false },
-};
+// Need raw body bytes for HMAC verification.
+export const config = { api: { bodyParser: false } };
 
 const readRawBody = (req: NextApiRequest): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -23,68 +24,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rawBody = await readRawBody(req);
 
     if (
-      !verifyLinearSignature(rawBody, req.headers["linear-signature"], env.LINEAR_WEBHOOK_SECRET)
+      !verifyLinearSignature(rawBody, req.headers["linear-signature"], env().LINEAR_WEBHOOK_SECRET)
     ) {
       console.warn("Rejected webhook: signature mismatch");
-      return res.status(401).json({ success: false, error: "Invalid signature" });
+      return res.status(401).json({ ok: false, error: "Invalid signature" });
     }
 
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(rawBody.toString("utf8"));
-    } catch (error) {
-      console.error("Webhook body is not valid JSON:", error);
-      return res.status(400).json({ success: false, error: "Invalid JSON" });
+    const parsed = WebhookPayloadSchema.safeParse(JSON.parse(rawBody.toString("utf8")));
+    if (!parsed.success) {
+      console.error("Invalid webhook payload:", parsed.error);
+      return res.status(400).json({ ok: false, error: "Invalid payload" });
     }
 
-    const validationResult = WebhookPayloadSchema.safeParse(parsedJson);
-    if (!validationResult.success) {
-      console.error("Invalid webhook payload:", validationResult.error);
-      return res.status(400).json({
-        success: false,
-        error: "Invalid webhook payload",
-        details: validationResult.error.flatten(),
-      });
+    const payload = parsed.data;
+    const message = formatEvent(payload);
+
+    if (!message) {
+      console.log("Skipped:", { type: payload.type, action: payload.action });
+      return res.json({ ok: true, skipped: true });
     }
 
-    const payload = validationResult.data;
-    const parsedEvent = parseLinearWebhook(payload);
+    console.log("Posting:", { type: payload.type, action: payload.action });
+    await sendToDiscord(message, isProjectEvent(payload));
 
-    if (!shouldNotifyDiscord(parsedEvent)) {
-      console.log("Event ignored:", {
-        type: payload.type,
-        action: payload.action,
-        priority: parsedEvent.priority,
-        reason: parsedEvent.message,
-      });
-      return res.json({
-        success: true,
-        message: "Event ignored",
-        data: { type: payload.type, action: payload.action, priority: parsedEvent.priority },
-      });
-    }
-
-    const finalMessage = formatDiscordMessage(parsedEvent);
-
-    console.log("Posting message:", {
-      type: payload.type,
-      action: payload.action,
-      priority: parsedEvent.priority,
-    });
-
-    const isProjectUpdate = payload.type === "Project" || payload.type === "ProjectUpdate";
-    await sendDiscordMessage(finalMessage, isProjectUpdate);
-
-    return res.json({
-      success: true,
-      data: { type: payload.type, action: payload.action, priority: parsedEvent.priority },
-    });
+    return res.json({ ok: true });
   } catch (error) {
-    console.error("Webhook handler error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal server error",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error("Webhook error:", error);
+    return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
