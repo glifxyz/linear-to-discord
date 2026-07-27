@@ -1,3 +1,4 @@
+import { strict as assert } from "node:assert";
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
@@ -255,6 +256,63 @@ describe("formatEvent", () => {
     expect(msg).toContain("Q3 Launch");
     expect(msg).toContain("Carol");
     expect(msg).toContain("> Slipping by a week.");
+  });
+
+  // Regression: a blind slice used to sever links mid-URL, e.g.
+  // "[MCP Public Launch](https://line..." which Discord renders as literal text.
+  it("never cuts a markdown link in half when truncating", () => {
+    const link = "[MCP Public Launch](https://linear.app/glif/project/mcp-public-launch-abc123)";
+    const msg = formatEvent(
+      payload({
+        type: "ProjectUpdate",
+        action: "create",
+        data: {
+          project: { name: "Q3 Launch" },
+          user: { name: "Carol" },
+          health: "onTrack",
+          body: `${"a".repeat(1480)} ${link} trailing text`,
+        },
+      })
+    );
+    assert(msg !== null);
+    // Either the link survives whole or it's dropped whole — never a fragment.
+    expect(msg.includes("[MCP Public Launch]")).toBe(msg.includes(link));
+  });
+
+  it("keeps a bare URL intact when truncating", () => {
+    const url = "https://github.com/glifxyz/marketing/blob/main/README.md#getting-started";
+    const msg = formatEvent(
+      payload({
+        type: "Comment",
+        action: "create",
+        data: {
+          body: `${"a".repeat(980)} ${url} more`,
+          user: { name: "Alice" },
+          issue: { title: "x", url: ISSUE_URL },
+        },
+      })
+    );
+    assert(msg !== null);
+    expect(msg.includes("https://github.com")).toBe(msg.includes(url));
+  });
+
+  it("keeps long project update bodies that fit under the limit whole", () => {
+    const body = `${"word ".repeat(200)}[link](https://linear.app/x)`;
+    const msg = formatEvent(
+      payload({
+        type: "ProjectUpdate",
+        action: "create",
+        data: {
+          project: { name: "Q3 Launch" },
+          user: { name: "Carol" },
+          health: "onTrack",
+          body,
+        },
+      })
+    );
+    assert(msg !== null);
+    expect(msg).toContain("[link](https://linear.app/x)");
+    expect(msg).not.toContain("...");
   });
 
   it("formats SLA breached with the issue link", () => {

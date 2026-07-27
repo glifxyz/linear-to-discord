@@ -40,7 +40,20 @@ export const verifyLinearSignature = (
   return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(header, "hex"));
 };
 
-const truncate = (s: string, n = 200) => (s.length <= n ? s : `${s.slice(0, n)}...`);
+// Discord renders a severed markdown link or bare URL as literal text, so when
+// the cut lands inside one, back it up to the start of that token.
+const LINKISH = /\[[^\]\n]*\]\([^)\s]*\)|https?:\/\/\S+/g;
+
+const truncate = (s: string, n = 200) => {
+  if (s.length <= n) return s;
+  let cut = n;
+  for (const m of s.matchAll(LINKISH)) {
+    if (m.index >= cut) break;
+    if (m.index + m[0].length > cut) cut = m.index;
+  }
+  // The whole allowance is one oversized link — nothing safe to keep.
+  return cut === 0 ? "..." : `${s.slice(0, cut).trimEnd()}...`;
+};
 
 const link = (text: string | undefined, url: string | undefined) =>
   text && url ? `[${text}](${url})` : (text ?? "");
@@ -98,7 +111,7 @@ export function formatEvent(p: WebhookPayload): string | null {
     case "ProjectUpdate:create": {
       const emoji = HEALTH_EMOJI[d.health];
       const head = `${emoji ? `${emoji} ` : ""}Project update on ${link(d.project?.name, url)} by ${d.user?.name}`;
-      return d.body ? `${head}:\n${blockquote(truncate(d.body, 500))}` : head;
+      return d.body ? `${head}:\n${blockquote(truncate(d.body, 1500))}` : head;
     }
 
     case "Cycle:create":
@@ -144,5 +157,8 @@ export const sendToDiscord = async (message: string, useProjectsWebhook = false)
     useProjectsWebhook && e.DISCORD_WEBHOOK_PROJECTS
       ? e.DISCORD_WEBHOOK_PROJECTS
       : e.DISCORD_WEBHOOK;
-  await wretch(url).post({ content: message }).res();
+  // Discord rejects content over 2000 chars; leave room for the ellipsis.
+  await wretch(url)
+    .post({ content: truncate(message, 1990) })
+    .res();
 };

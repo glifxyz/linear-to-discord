@@ -50,8 +50,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.json({ ok: true, skipped: true });
     }
 
-    console.log("Posting:", ctx);
-    await sendToDiscord(message, isProjectEvent(payload));
+    const projects = isProjectEvent(payload);
+    console.log("Posting:", { ...ctx, projects, length: message.length, message });
+    await sendToDiscord(message, projects);
 
     return res.json({ ok: true });
   } catch (error) {
