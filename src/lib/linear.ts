@@ -151,14 +151,13 @@ export function formatEvent(p: WebhookPayload): string | null {
 export const isProjectEvent = (p: WebhookPayload): boolean =>
   p.type === "Project" || p.type === "ProjectUpdate";
 
-export const sendToDiscord = async (message: string, useProjectsWebhook = false): Promise<void> => {
+// Project events go to the main channel *and* the projects channel, so they keep
+// their place in the normal feed while also getting extra visibility.
+export const sendToDiscord = async (message: string, alsoProjects = false): Promise<void> => {
   const e = env();
-  const url =
-    useProjectsWebhook && e.DISCORD_WEBHOOK_PROJECTS
-      ? e.DISCORD_WEBHOOK_PROJECTS
-      : e.DISCORD_WEBHOOK;
   // Discord rejects content over 2000 chars; leave room for the ellipsis.
-  await wretch(url)
-    .post({ content: truncate(message, 1990) })
-    .res();
+  const content = truncate(message, 1990);
+  const urls = [e.DISCORD_WEBHOOK];
+  if (alsoProjects && e.DISCORD_WEBHOOK_PROJECTS) urls.push(e.DISCORD_WEBHOOK_PROJECTS);
+  await Promise.all(urls.map((url) => wretch(url).post({ content }).res()));
 };

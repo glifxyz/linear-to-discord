@@ -1,8 +1,10 @@
 import { strict as assert } from "node:assert";
 import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { createServer } from "node:http";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   formatEvent,
+  sendToDiscord,
   verifyLinearSignature,
   type WebhookPayload,
   WebhookPayloadSchema,
@@ -349,5 +351,52 @@ describe("formatEvent", () => {
     expect(
       formatEvent(payload({ type: "Project", action: "update", data: { name: "x" } }))
     ).toBeNull();
+  });
+});
+
+describe("sendToDiscord", () => {
+  // A real local server rather than a fetch mock, so we exercise the actual POSTs.
+  const received: Array<{ path: string; content: string }> = [];
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c) => chunks.push(Buffer.from(c)));
+    req.on("end", () => {
+      received.push({
+        path: req.url ?? "",
+        content: JSON.parse(Buffer.concat(chunks).toString()).content,
+      });
+      res.writeHead(204).end();
+    });
+  });
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const addr = server.address();
+    assert(addr !== null && typeof addr === "object");
+    process.env.DISCORD_WEBHOOK = `http://127.0.0.1:${addr.port}/main`;
+    process.env.DISCORD_WEBHOOK_PROJECTS = `http://127.0.0.1:${addr.port}/projects`;
+    process.env.LINEAR_WEBHOOK_SECRET = "test-secret";
+  });
+
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  it("posts non-project events to the main webhook only", async () => {
+    received.length = 0;
+    await sendToDiscord("an issue changed");
+    expect(received).toEqual([{ path: "/main", content: "an issue changed" }]);
+  });
+
+  it("posts project events to both webhooks", async () => {
+    received.length = 0;
+    await sendToDiscord("a project update", true);
+    expect(received.map((r) => r.path).sort()).toEqual(["/main", "/projects"]);
+    expect(received.every((r) => r.content === "a project update")).toBe(true);
+  });
+
+  it("clamps content to Discord's message limit", async () => {
+    received.length = 0;
+    await sendToDiscord("x".repeat(3000));
+    assert(received[0]);
+    expect(received[0].content.length).toBeLessThanOrEqual(2000);
   });
 });

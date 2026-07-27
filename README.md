@@ -20,7 +20,7 @@ Unknown event types and noisy ones (reactions, label-only updates, attachments) 
 3. Set Vercel env vars (Project → Settings → Environment Variables):
    - `DISCORD_WEBHOOK` — Discord webhook URL **(required)**
    - `LINEAR_WEBHOOK_SECRET` — Linear's signing secret **(required, HMAC verification)**
-   - `DISCORD_WEBHOOK_PROJECTS` — optional, separate webhook for `Project` / `ProjectUpdate` events
+   - `DISCORD_WEBHOOK_PROJECTS` — optional. When set, `Project` / `ProjectUpdate` events are posted here *in addition to* `DISCORD_WEBHOOK`, for extra visibility in a busier channel.
 4. Deploy. Confirm the Linear webhook is **enabled**.
 
 ## Development
