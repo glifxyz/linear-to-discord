@@ -8,7 +8,7 @@ The whole thing is one API route plus one library file (~250 lines of TypeScript
 
 1. Linear POSTs to `/api/webhook` whenever an event happens (issue created, comment posted, etc.)
 2. The handler verifies Linear's HMAC-SHA256 signature against the raw body
-3. The event is formatted into a one-liner like `New issue created: [Login broken](https://linear.app/…)`
+3. The event is formatted into a one-liner like `New issue created: [Login broken](https://linear.app/…)`; project updates use rich embeds with linked titles and health-colored bars
 4. The message is forwarded to your Discord webhook
 
 Unknown event types and noisy ones (reactions, label-only updates, attachments) are silently skipped. `Issue:update` only fires on state, assignee, or title changes.
