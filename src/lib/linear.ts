@@ -64,17 +64,51 @@ const blockquote = (s: string) =>
     .map((line) => `> ${line}`)
     .join("\n");
 
-const HEALTH_EMOJI: Record<string, string> = {
-  onTrack: "🟢",
-  atRisk: "🟡",
-  offTrack: "🔴",
-  completed: "✅",
+const PROJECT_HEALTH: Record<string, { color: number; label: string }> = {
+  onTrack: { color: 0x57f287, label: "On track" },
+  atRisk: { color: 0xfee75c, label: "At risk" },
+  offTrack: { color: 0xed4245, label: "Off track" },
+  completed: { color: 0x5865f2, label: "Completed" },
 };
 
-// Returns the Discord message string, or null if the event should be skipped.
+const ANGLE_WRAPPED_MARKDOWN_LINK = /\[([^\]\n]+)\]\(<(https?:\/\/[^>\n]+)>\)/g;
+
+// Linear represents auto-linked URLs as [https://example.com/path](<https://example.com/path>).
+// Discord does not reliably parse that form, even inside embeds. Remove the angle brackets and
+// replace noisy raw-URL labels with a compact human-readable label.
+const normalizeDiscordLinks = (markdown: string): string =>
+  markdown.replace(ANGLE_WRAPPED_MARKDOWN_LINK, (_match, label: string, target: string) => {
+    let display = label;
+    if (label === target) {
+      try {
+        const parsed = new URL(target);
+        const hostname = parsed.hostname.replace(/^www\./, "");
+        const hasPath =
+          parsed.pathname !== "/" || parsed.search.length > 0 || parsed.hash.length > 0;
+        display = `${hostname}${hasPath ? "/…" : ""}`;
+      } catch {
+        // The regex only accepts HTTP(S), but keep the original label if URL parsing ever fails.
+      }
+    }
+    return `[${display}](${target})`;
+  });
+
+export type DiscordEmbed = {
+  title: string;
+  url?: string;
+  description?: string;
+  color?: number;
+  author?: { name: string };
+  footer?: { text: string };
+  timestamp?: string;
+};
+
+export type DiscordMessage = string | { embeds: DiscordEmbed[] };
+
+// Returns the Discord message payload, or null if the event should be skipped.
 // Skipped: noisy events (Reaction, IssueAttachment, IssueLabel, label-only updates),
 // Issue updates that don't change state/assignee/title, and any unknown type/action.
-export function formatEvent(p: WebhookPayload): string | null {
+export function formatEvent(p: WebhookPayload): DiscordMessage | null {
   // biome-ignore lint/suspicious/noExplicitAny: heterogeneous payload shape, validated as a webhook above.
   const d = (p.data ?? {}) as any;
   const url = p.url;
@@ -109,9 +143,20 @@ export function formatEvent(p: WebhookPayload): string | null {
       return `New project created: ${link(d.name, url)}`;
 
     case "ProjectUpdate:create": {
-      const emoji = HEALTH_EMOJI[d.health];
-      const head = `${emoji ? `${emoji} ` : ""}Project update on ${link(d.project?.name, url)} by ${d.user?.name}`;
-      return d.body ? `${head}:\n${blockquote(truncate(d.body, 1500))}` : head;
+      const health = PROJECT_HEALTH[d.health];
+      const timestamp =
+        typeof d.createdAt === "string" && !Number.isNaN(Date.parse(d.createdAt))
+          ? new Date(d.createdAt).toISOString()
+          : undefined;
+      const embed: DiscordEmbed = {
+        title: truncate(d.project?.name ?? "Project update", 256),
+        ...(url ? { url } : {}),
+        ...(d.body ? { description: truncate(normalizeDiscordLinks(d.body), 4000) } : {}),
+        ...(health ? { color: health.color, footer: { text: health.label } } : {}),
+        ...(d.user?.name ? { author: { name: truncate(d.user.name, 256) } } : {}),
+        ...(timestamp ? { timestamp } : {}),
+      };
+      return { embeds: [embed] };
     }
 
     case "Cycle:create":
@@ -153,11 +198,15 @@ export const isProjectEvent = (p: WebhookPayload): boolean =>
 
 // Project events go to the main channel *and* the projects channel, so they keep
 // their place in the normal feed while also getting extra visibility.
-export const sendToDiscord = async (message: string, alsoProjects = false): Promise<void> => {
+export const sendToDiscord = async (
+  message: DiscordMessage,
+  alsoProjects = false
+): Promise<void> => {
   const e = env();
-  // Discord rejects content over 2000 chars; leave room for the ellipsis.
-  const content = truncate(message, 1990);
+  // Discord rejects content over 2000 chars; leave room for the ellipsis. Rich embeds are already
+  // clamped to their field limits by formatEvent.
+  const payload = typeof message === "string" ? { content: truncate(message, 1990) } : message;
   const urls = [e.DISCORD_WEBHOOK];
   if (alsoProjects && e.DISCORD_WEBHOOK_PROJECTS) urls.push(e.DISCORD_WEBHOOK_PROJECTS);
-  await Promise.all(urls.map((url) => wretch(url).post({ content }).res()));
+  await Promise.all(urls.map((url) => wretch(url).post(payload).res()));
 };

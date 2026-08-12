@@ -59,6 +59,13 @@ const payload = (overrides: Partial<WebhookPayload>): WebhookPayload =>
 
 const ISSUE_URL = "https://linear.app/team/issue/ENG-42";
 
+const projectUpdateEmbed = (message: ReturnType<typeof formatEvent>) => {
+  assert(message !== null && typeof message !== "string");
+  const embed = message.embeds[0];
+  assert(embed);
+  return embed;
+};
+
 describe("WebhookPayloadSchema", () => {
   it("accepts payloads with no url (some Linear events omit it)", () => {
     const result = WebhookPayloadSchema.safeParse({
@@ -240,24 +247,51 @@ describe("formatEvent", () => {
     ).toBe(`New project created: [Q3 Launch](${projectUrl})`);
   });
 
-  it("formats ProjectUpdate create with health emoji and blockquoted body", () => {
+  it("formats ProjectUpdate create as a linked, health-colored embed", () => {
     const msg = formatEvent(
       payload({
         type: "ProjectUpdate",
         action: "create",
-        url: "https://linear.app/team/project/q3-launch",
+        url: "https://linear.app/team/project/q3-launch/update/123",
         data: {
           project: { name: "Q3 Launch" },
           user: { name: "Carol" },
           health: "atRisk",
           body: "Slipping by a week.",
+          createdAt: "2026-08-12T12:34:56.000Z",
         },
       })
     );
-    expect(msg).toContain("🟡");
-    expect(msg).toContain("Q3 Launch");
-    expect(msg).toContain("Carol");
-    expect(msg).toContain("> Slipping by a week.");
+    expect(projectUpdateEmbed(msg)).toEqual({
+      title: "Q3 Launch",
+      url: "https://linear.app/team/project/q3-launch/update/123",
+      description: "Slipping by a week.",
+      color: 0xfee75c,
+      author: { name: "Carol" },
+      footer: { text: "At risk" },
+      timestamp: "2026-08-12T12:34:56.000Z",
+    });
+  });
+
+  it("normalizes Linear's angle-wrapped links for Discord embed markdown", () => {
+    const notionUrl = "https://app.notion.com/p/glifxyz/Sindy-De-Vries-123";
+    const githubUrl = "https://github.com/glifxyz/marketing";
+    const msg = formatEvent(
+      payload({
+        type: "ProjectUpdate",
+        action: "create",
+        data: {
+          project: { name: "Outbound" },
+          user: { name: "Lamia" },
+          health: "onTrack",
+          body: `Sindy: [${notionUrl}](<${notionUrl}>)\n[Marketing repo](<${githubUrl}>)`,
+        },
+      })
+    );
+
+    expect(projectUpdateEmbed(msg).description).toBe(
+      `Sindy: [app.notion.com/…](${notionUrl})\n[Marketing repo](${githubUrl})`
+    );
   });
 
   // Regression: a blind slice used to sever links mid-URL, e.g.
@@ -272,13 +306,13 @@ describe("formatEvent", () => {
           project: { name: "Q3 Launch" },
           user: { name: "Carol" },
           health: "onTrack",
-          body: `${"a".repeat(1480)} ${link} trailing text`,
+          body: `${"a".repeat(3980)} ${link} trailing text`,
         },
       })
     );
-    assert(msg !== null);
+    const description = projectUpdateEmbed(msg).description ?? "";
     // Either the link survives whole or it's dropped whole — never a fragment.
-    expect(msg.includes("[MCP Public Launch]")).toBe(msg.includes(link));
+    expect(description.includes("[MCP Public Launch]")).toBe(description.includes(link));
   });
 
   it("keeps a bare URL intact when truncating", () => {
@@ -294,12 +328,12 @@ describe("formatEvent", () => {
         },
       })
     );
-    assert(msg !== null);
+    assert(typeof msg === "string");
     expect(msg.includes("https://github.com")).toBe(msg.includes(url));
   });
 
   it("keeps long project update bodies that fit under the limit whole", () => {
-    const body = `${"word ".repeat(200)}[link](https://linear.app/x)`;
+    const body = `${"word ".repeat(700)}[link](https://linear.app/x)`;
     const msg = formatEvent(
       payload({
         type: "ProjectUpdate",
@@ -312,9 +346,9 @@ describe("formatEvent", () => {
         },
       })
     );
-    assert(msg !== null);
-    expect(msg).toContain("[link](https://linear.app/x)");
-    expect(msg).not.toContain("...");
+    const description = projectUpdateEmbed(msg).description ?? "";
+    expect(description).toContain("[link](https://linear.app/x)");
+    expect(description).not.toContain("...");
   });
 
   it("formats SLA breached with the issue link", () => {
@@ -356,14 +390,16 @@ describe("formatEvent", () => {
 
 describe("sendToDiscord", () => {
   // A real local server rather than a fetch mock, so we exercise the actual POSTs.
-  const received: Array<{ path: string; content: string }> = [];
+  const received: Array<{ path: string; content?: string; embeds?: unknown[] }> = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (c) => chunks.push(Buffer.from(c)));
     req.on("end", () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString());
       received.push({
         path: req.url ?? "",
-        content: JSON.parse(Buffer.concat(chunks).toString()).content,
+        ...(body.content !== undefined ? { content: body.content } : {}),
+        ...(body.embeds !== undefined ? { embeds: body.embeds } : {}),
       });
       res.writeHead(204).end();
     });
@@ -388,15 +424,17 @@ describe("sendToDiscord", () => {
 
   it("posts project events to both webhooks", async () => {
     received.length = 0;
-    await sendToDiscord("a project update", true);
+    const embeds = [{ title: "Q3 Launch", description: "A [link](https://example.com)" }];
+    await sendToDiscord({ embeds }, true);
     expect(received.map((r) => r.path).sort()).toEqual(["/main", "/projects"]);
-    expect(received.every((r) => r.content === "a project update")).toBe(true);
+    expect(received.every((r) => JSON.stringify(r.embeds) === JSON.stringify(embeds))).toBe(true);
   });
 
   it("clamps content to Discord's message limit", async () => {
     received.length = 0;
     await sendToDiscord("x".repeat(3000));
-    assert(received[0]);
-    expect(received[0].content.length).toBeLessThanOrEqual(2000);
+    const content = received[0]?.content;
+    assert(content);
+    expect(content.length).toBeLessThanOrEqual(2000);
   });
 });

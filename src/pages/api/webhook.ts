@@ -51,7 +51,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const projects = isProjectEvent(payload);
-    console.log("Posting:", { ...ctx, projects, length: message.length, message });
+    const length = typeof message === "string" ? message.length : JSON.stringify(message).length;
+    console.log("Posting:", { ...ctx, projects, length, message });
     await sendToDiscord(message, projects);
 
     return res.json({ ok: true });
