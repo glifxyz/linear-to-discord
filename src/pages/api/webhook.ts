@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import {
   env,
   formatEvent,
+  isFreshWebhook,
   isProjectEvent,
   sendToDiscord,
   verifyLinearSignature,
@@ -42,6 +43,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const payload = parsed.data;
+    if (!isFreshWebhook(payload.webhookTimestamp)) {
+      console.warn("Rejected webhook: stale timestamp", {
+        delivery,
+        webhookTimestamp: payload.webhookTimestamp,
+      });
+      return res.status(401).json({ ok: false, error: "Stale webhook" });
+    }
+
     const ctx = { delivery, type: payload.type, action: payload.action, url: payload.url };
     const message = formatEvent(payload);
 

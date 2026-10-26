@@ -7,7 +7,7 @@ The whole thing is one API route plus one library file (~250 lines of TypeScript
 ## How it works
 
 1. Linear POSTs to `/api/webhook` whenever an event happens (issue created, comment posted, etc.)
-2. The handler verifies Linear's HMAC-SHA256 signature against the raw body
+2. The handler verifies Linear's HMAC-SHA256 signature against the raw body, then rejects deliveries whose `webhookTimestamp` is more than a minute off (replay protection)
 3. The event is formatted into a one-liner like `New issue created: [Login broken](https://linear.app/…)`; project updates use rich embeds with linked titles and health-colored bars
 4. The message is forwarded to your Discord webhook
 
@@ -20,7 +20,7 @@ Unknown event types and noisy ones (reactions, label-only updates, attachments) 
 3. Set Vercel env vars (Project → Settings → Environment Variables):
    - `DISCORD_WEBHOOK` — Discord webhook URL **(required)**
    - `LINEAR_WEBHOOK_SECRET` — Linear's signing secret **(required, HMAC verification)**
-   - `DISCORD_WEBHOOK_PROJECTS` — optional. When set, `Project` / `ProjectUpdate` events are posted here *in addition to* `DISCORD_WEBHOOK`, for extra visibility in a busier channel.
+   - `DISCORD_WEBHOOK_PROJECTS` — optional. When set, `Project` / `ProjectUpdate` events are posted here _in addition to_ `DISCORD_WEBHOOK`, for extra visibility in a busier channel.
 4. Deploy. Confirm the Linear webhook is **enabled**.
 
 ## Development
@@ -35,7 +35,7 @@ pnpm typecheck    # tsc --noEmit
 pnpm build        # next build
 ```
 
-Stack: [Next.js 16](https://nextjs.org/) (Pages Router), [React 19](https://react.dev/), [TypeScript 5.9](https://www.typescriptlang.org/), [Zod 4](https://zod.dev/) for schemas + env validation, [wretch](https://github.com/elbywan/wretch) for HTTP, [vitest](https://vitest.dev/) for tests, [Biome](https://biomejs.dev/) for lint + format. Node 22.14.x, pnpm.
+Stack: [Next.js 16](https://nextjs.org/) (Pages Router), [React 19](https://react.dev/), [TypeScript 7](https://www.typescriptlang.org/), [Zod 4](https://zod.dev/) for schemas + env validation, [wretch](https://github.com/elbywan/wretch) for HTTP, [vitest](https://vitest.dev/) for tests, [Biome](https://biomejs.dev/) for lint + format. Node 22, pnpm 11.
 
 ## Layout
 
@@ -43,7 +43,7 @@ Stack: [Next.js 16](https://nextjs.org/) (Pages Router), [React 19](https://reac
 src/
 ├── lib/
 │   ├── linear.ts         everything: env, schema, HMAC verify, formatter, Discord sender
-│   └── linear.test.ts    26 tests
+│   └── linear.test.ts    tests
 └── pages/
     ├── api/
     │   └── webhook.ts    Next handler
@@ -57,6 +57,7 @@ Every request logs a structured line to Vercel:
 - `Posting: { delivery, type, action, url }` — sent to Discord
 - `Skipped: { delivery, type, action, url }` — event ignored (noisy or unknown)
 - `Rejected webhook: signature mismatch` — 401
+- `Rejected webhook: stale timestamp` — 401
 - `Invalid webhook payload` — 400 (rare, schema is lenient)
 
 `delivery` is Linear's `linear-delivery` header — useful for correlating with Linear's webhook log when debugging.

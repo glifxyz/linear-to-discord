@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   formatEvent,
+  isFreshWebhook,
   sendToDiscord,
   verifyLinearSignature,
   type WebhookPayload,
@@ -45,6 +46,31 @@ describe("verifyLinearSignature", () => {
 
   it("rejects a header of wrong length without throwing", () => {
     expect(verifyLinearSignature(body, "deadbeef", secret)).toBe(false);
+  });
+
+  it("rejects a non-hex header of the right length without throwing", () => {
+    expect(verifyLinearSignature(body, "z".repeat(64), secret)).toBe(false);
+  });
+
+  it("rejects a valid signature with trailing junk", () => {
+    expect(verifyLinearSignature(body, `${sign(body, secret)}x`, secret)).toBe(false);
+  });
+});
+
+describe("isFreshWebhook", () => {
+  const now = 1_700_000_000_000;
+
+  it("accepts timestamps within a minute either way", () => {
+    expect(isFreshWebhook(now - 60_000, now)).toBe(true);
+    expect(isFreshWebhook(now + 60_000, now)).toBe(true);
+  });
+
+  it("rejects replays older than a minute", () => {
+    expect(isFreshWebhook(now - 60_001, now)).toBe(false);
+  });
+
+  it("rejects payloads without a timestamp", () => {
+    expect(isFreshWebhook(undefined, now)).toBe(false);
   });
 });
 

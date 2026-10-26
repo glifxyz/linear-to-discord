@@ -24,6 +24,7 @@ export const WebhookPayloadSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
   url: z.string().optional(),
   updatedFrom: z.record(z.string(), z.unknown()).optional(),
+  webhookTimestamp: z.number().optional(),
 });
 
 export type WebhookPayload = z.infer<typeof WebhookPayloadSchema>;
@@ -33,12 +34,17 @@ export const verifyLinearSignature = (
   header: string | string[] | undefined,
   secret: string
 ): boolean => {
-  if (typeof header !== "string" || header.length === 0) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  // timingSafeEqual requires equal-length buffers; bail early.
-  if (expected.length !== header.length) return false;
-  return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(header, "hex"));
+  // timingSafeEqual throws on unequal lengths, and Buffer.from silently drops non-hex input.
+  if (typeof header !== "string" || !/^[0-9a-f]{64}$/i.test(header)) return false;
+  const expected = createHmac("sha256", secret).update(rawBody).digest();
+  return timingSafeEqual(expected, Buffer.from(header, "hex"));
 };
+
+// Linear recommends rejecting deliveries more than a minute old to block replayed requests.
+const MAX_WEBHOOK_AGE_MS = 60_000;
+
+export const isFreshWebhook = (timestamp: number | undefined, now = Date.now()): boolean =>
+  timestamp !== undefined && Math.abs(now - timestamp) <= MAX_WEBHOOK_AGE_MS;
 
 // Discord renders a severed markdown link or bare URL as literal text, so when
 // the cut lands inside one, back it up to the start of that token.
